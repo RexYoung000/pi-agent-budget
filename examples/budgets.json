@@ -1,0 +1,45 @@
+{
+  "//": "示例 budget 配置。复制到 ~/.pi/budget.json 后生效。",
+
+  "session": {
+    "usd": 1.0,
+    "tokens": 200000,
+    "minutes": 30
+  },
+
+  "project": {
+    "usdPerDay": 10,
+    "usdPerWeek": 50
+  },
+
+  "global": {
+    "usdPerMonth": 200
+  },
+
+  "onSoftLimit": "notify",
+  "onHardLimit": "pause",
+  "downgradeTo": "claude-haiku-3.5",
+
+  "softLimitRatio": 0.8,
+  "hardLimitRatio": 1.0,
+
+  "// profiles": "方便切换的预算预设（v2 通过 /budget config 切换）",
+
+  "profiles": {
+    "vibe-fast": {
+      "session": { "usd": 5 },
+      "onSoftLimit": "notify"
+    },
+    "plan-careful": {
+      "session": { "usd": 0.5 },
+      "onSoftLimit": "pause",
+      "downgradeTo": "claude-haiku-3.5"
+    },
+    "ci-agent": {
+      "session": { "usd": 0.2 },
+      "onSoftLimit": "downgrade",
+      "onHardLimit": "abort",
+      "downgradeTo": "claude-haiku-3.5"
+    }
+  }
+}

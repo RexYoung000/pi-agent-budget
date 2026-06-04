@@ -1,0 +1,22 @@
+# Node / TypeScript
+node_modules/
+*.tsbuildinfo
+*.log
+
+# SQLite db（用户本地数据，不入库）
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# 用户配置 / 日志（运行时生成）
+budget.json
+budget-export-*
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
