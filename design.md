@@ -341,12 +341,16 @@ By Tool:
 - ✅ 模型定价信任 `usage.cost.total`（pi 已内置），不自行计算
 - ✅ projectId：`git remote get-url origin` → sha256；失败回退 cwd 绝对路径 → sha256
 
-第一版只做这 4 件事：
+第一版做这 5 件事（在原 4 项基础上叠加 4 项边缘情况兜底，约 +25 行）：
 
 1. ✅ 监听 `message_end`，SQLite 累计成本
-2. ✅ 状态栏 widget 显示 `$used/$budget`
+2. ✅ 状态栏 widget 显示 `$used/$budget`（同时监听 `model_select` 事件刷新，防止切模型后 widget 显示错模型）
 3. ✅ `/budget set N` + 软/硬限弹窗
 4. ✅ `/budget report` 简单文本报表（不做 TUI 图表）
+5. ✅ **边缘情况兜底**（一起做掉，避免后续返工）：
+   - `~/.pi/budget.json` 支持手填 `projectId`，覆盖自动 git remote / cwd hash（移动文件夹不断历史）
+   - `~/.pi/budget.json` 不存在时使用合理默认值，不让扩展崩溃
+   - `usage.cost.total` 缺失（如 pi 未识别新模型定价）时记 0 + warning log
 
 **不做**（留给 v2）：
 - ❌ 自动降级策略
