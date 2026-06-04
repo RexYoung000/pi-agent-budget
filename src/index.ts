@@ -3,10 +3,10 @@
  *
  * 设计文档：../design.md
  *
- * 当前状态：🚧 脚手架（scaffold-only）
- *   - 注册一个最小可加载的扩展
- *   - 监听 `message_end` 仅打 log，不做任何业务逻辑
- *   - 后续按 design.md §8 MVP 范围逐步实现
+ * 当前实现进度：MVP Step 1 ✅（Layer 1 数据库写入 + cost 累计）
+ *   - message_end 钩子 → SQLite
+ *   - 内存缓存避免每条都查 SUM
+ *   - cost.total 缺失时打 warning（兜底）
  *
  * 加载方式：
  *   pi -e ./src/index.ts
@@ -15,74 +15,121 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
+import { BudgetDb } from "./db/client.js";
+import { createTracker, lastToolName } from "./core/tracker.js";
+import { getProjectId } from "./core/project.js";
+import { loadConfig } from "./config.js";
+
 export default function (pi: ExtensionAPI) {
   // ────────────────────────────────────────────────────────────────────────
-  // Layer 1: Observability
+  // 共享状态：lazy 初始化
   // ────────────────────────────────────────────────────────────────────────
-  // TODO(MVP): 在 message_end 累计 CostRecord 到 SQLite，并刷新状态栏 widget
-  // TODO(MVP): 在 session_start 初始化 / 恢复预算上下文
-  // TODO(MVP): 在 session_shutdown 关闭 db 句柄
-  //
-  // pi.on("session_start", async (_event, ctx) => { ... });
-  // pi.on("session_shutdown", async (_event, _ctx) => { ... });
+  let dbPromise: Promise<BudgetDb> | null = null;
+  // cwd → projectId 缓存（一次会话同一个 cwd 不会变）
+  const projectIdCache = new Map<string, string>();
+  const config = loadConfig();
 
-  pi.on("message_end", async (event, _ctx) => {
+  async function getDb(): Promise<BudgetDb> {
+    if (!dbPromise) {
+      dbPromise = BudgetDb.open();
+      dbPromise.catch(() => {
+        // 失败后允许下次重试
+        dbPromise = null;
+      });
+    }
+    return dbPromise;
+  }
+
+  function getProjectIdForCwd(cwd: string): string {
+    const cached = projectIdCache.get(cwd);
+    if (cached) return cached;
+    const id = getProjectId(cwd, config.projectIdOverride);
+    projectIdCache.set(cwd, id);
+    return id;
+  }
+
+  function getSessionId(ctx: { sessionManager?: { getSessionFile?: () => string | undefined } }): string {
+    return ctx.sessionManager?.getSessionFile?.() ?? "ephemeral";
+  }
+
+  // ────────────────────────────────────────────────────────────────────────
+  // Layer 1: Observability —— message_end → SQLite
+  // ────────────────────────────────────────────────────────────────────────
+  pi.on("message_end", async (event, ctx) => {
     if (event.message.role !== "assistant") return;
 
-    const usage = (event.message as { usage?: { cost?: { total?: number } } }).usage;
-    if (!usage?.cost?.total) return;
+    const message = event.message as {
+      model?: string;
+      content?: unknown;
+      usage?: {
+        input?: number;
+        output?: number;
+        cacheRead?: number;
+        cacheWrite?: number;
+        cost?: {
+          input?: number;
+          output?: number;
+          cacheRead?: number;
+          cacheWrite?: number;
+          total?: number;
+        };
+      };
+    };
 
-    // Scaffold-only: 仅在 debug log 中留痕
-    // TODO(MVP): await db.insertCost({ ... }); updateStatusBar(); checkLimits(ctx);
-    console.log(
-      `[pi-budget] scaffold log — model=${event.message.model ?? "?"} cost=$${usage.cost.total.toFixed(6)}`,
-    );
+    const usage = message.usage;
+    const costTotal = usage?.cost?.total;
+
+    // 兜底 #3：cost 缺失（pi 未识别新模型定价）→ 记 0 + warn，不报错
+    if (costTotal == null) {
+      console.warn(
+        `[pi-budget] usage.cost.total 缺失，跳过记录（model=${message.model ?? "?"}）`,
+      );
+      return;
+    }
+
+    try {
+      const db = await getDb();
+      const tracker = createTracker(db);
+
+      const sessionId = getSessionId(ctx);
+      const projectId = getProjectIdForCwd(ctx.cwd);
+
+      tracker.record({
+        sessionId,
+        projectId,
+        model: message.model ?? "unknown",
+        inputTokens: usage?.input ?? 0,
+        outputTokens: usage?.output ?? 0,
+        cacheRead: usage?.cacheRead ?? 0,
+        cacheWrite: usage?.cacheWrite ?? 0,
+        cost: {
+          input: usage?.cost?.input ?? 0,
+          output: usage?.cost?.output ?? 0,
+          cacheRead: usage?.cost?.cacheRead ?? 0,
+          cacheWrite: usage?.cost?.cacheWrite ?? 0,
+          total: costTotal,
+        },
+        toolName: lastToolName(message),
+      });
+
+      // MVP Step 2 会接 widget 刷新；这里先留空调用
+      tracker.refreshWidget(sessionId);
+    } catch (err) {
+      // 永远不要让 budget 扩展把 agent 主流程搞崩
+      console.warn(`[pi-budget] message_end 处理失败: ${(err as Error).message}`);
+    }
   });
 
   // ────────────────────────────────────────────────────────────────────────
-  // Layer 2: Control
+  // Layer 2: Control（待 Step 3）
   // ────────────────────────────────────────────────────────────────────────
-  // TODO(MVP): 在 `input` 事件里判断是否触达硬限，返回 { action: "handled" }
-  //            阻止消息进入 agent；pi 无 `user_message_submit` 钩子（见 §13 #4）
-  // TODO(v2):  降级 / before_provider_request payload 重写
-  //            —— pi 没有 `provider_request` 钩子，
-  //            降级用 pi.setModel()（见 §13 #5）；
-  //            `before_provider_request` 返回完整 payload 替换，
-  //            MVP 不用，v2 再评估是否值得。
+  // TODO(MVP Step 3): input 事件硬限拦截 + 软限弹窗
 
   // ────────────────────────────────────────────────────────────────────────
-  // Layer 3: Optimization
+  // Layer 3: Optimization（v2）
   // ────────────────────────────────────────────────────────────────────────
-  // TODO(v2): 洞察规则引擎在 /budget report 中输出建议
 
   // ────────────────────────────────────────────────────────────────────────
-  // Commands
+  // Commands（待 Step 3-4）
   // ────────────────────────────────────────────────────────────────────────
-  // TODO(MVP): 注册 `/budget` 命令族，分发到下列子模块：
-  //            - 无参数 → commands/overview.ts  （当前会话快照）
-  //            - `set [scope] <usd>` → commands/set.ts
-  //            - `unset [scope]`      → commands/set.ts
-  //            - `report [range]`     → commands/report.ts
-  //            - `by <dim>`           → commands/report.ts
-  //            - `export [format]`    → commands/export.ts （v2 / 可选）
-  //            - `downgrade ...`      → commands/downgrade.ts （v2）
-  //
-  // pi.registerCommand("budget", {
-  //   description: "AI cost budget management",
-  //   handler: async (args, ctx) => {
-  //     const trimmed = (args ?? "").trim();
-  //     if (trimmed === "") return runOverview(await gatherOverview(ctx));
-  //     const [sub, ...rest] = trimmed.split(/\s+/);
-  //     switch (sub) {
-  //       case "set":    return runSet(rest.join(" "), ctx);
-  //       case "unset":  return runUnset(rest.join(" "), ctx);
-  //       case "report": return runReport(parseRange(rest[0]), ctx.session.id);
-  //       case "by":     return runBy(rest[0] as "model"|"tool"|"session", ctx.session.id);
-  //       case "export": return runExport(parseExportFormat(rest[0]), ctx.session.id);
-  //       case "downgrade": return runDowngrade(parseDowngradeArgs(rest.join(" ")));
-  //       default: return `未知子命令: ${sub}`;
-  //     }
-  //   },
-  // });
-  void pi;
 }

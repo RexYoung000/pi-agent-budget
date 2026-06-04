@@ -20,6 +20,7 @@
     "better-sqlite3": "^11.5.0"
   },
   "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.78.0",
     "@types/better-sqlite3": "^7.6.11",
     "typescript": "^5.6.0"
   },

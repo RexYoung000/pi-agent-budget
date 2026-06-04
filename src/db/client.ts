@@ -2,13 +2,14 @@
  * SQLite 客户端封装（better-sqlite3）
  *
  * 设计文档：../design.md §4.4 / §9
- *
- * 状态：🚧 scaffold-only
- *
- * 注意：better-sqlite3 是原生模块，安装需要编译环境，详见 README "安装须知"。
  */
 
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
+import { mkdirSync } from "node:fs";
+
 import type { Database as BetterSqlite3Database } from "better-sqlite3";
+import { migrate } from "./migrations.js";
 
 // ──────────────────────────────────────────────────────────────────────────
 // Types（与 schema.sql 一一对应）
@@ -58,69 +59,179 @@ export interface AlertRow {
   resolvedAction?: "continue" | "downgrade" | "abort" | "raised_budget";
 }
 
+export interface AggregateRow {
+  key: string;
+  total: number;
+  count: number;
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // Client
 // ──────────────────────────────────────────────────────────────────────────
 
+const DEFAULT_DB_DIR = join(homedir(), ".pi");
+const DEFAULT_DB_PATH = join(DEFAULT_DB_DIR, "budget.db");
+
 export class BudgetDb {
   /** SQLite file path. Default: ~/.pi/budget.db */
-  static defaultPath = "~/.pi/budget.db"; // TODO: resolve home dir at runtime
+  static defaultPath = DEFAULT_DB_PATH;
 
   private constructor(private readonly db: BetterSqlite3Database) {}
 
   /** Open (or create) the database and run migrations. */
-  static async open(_path?: string): Promise<BudgetDb> {
-    // TODO(MVP): 动态 import("better-sqlite3") 后 new Database(path)
-    //            并调用 migrations.ts 跑 schema.sql
-    throw new Error("BudgetDb.open() not implemented (scaffold-only)");
+  static async open(path: string = DEFAULT_DB_PATH): Promise<BudgetDb> {
+    // 确保目录存在（better-sqlite3 不会自己创建）
+    const dir = resolve(path, "..");
+    mkdirSync(dir, { recursive: true });
+
+    // 动态 import：避免在测试 / 类型检查时强依赖原生模块
+    const { default: Database } = await import("better-sqlite3");
+    const db = new Database(path);
+    db.pragma("journal_mode = WAL");
+    db.pragma("synchronous = NORMAL");
+
+    migrate(db);
+    return new BudgetDb(db);
   }
 
   // ── CostRecord ───────────────────────────────────────────────────────
-  insertCost(_record: CostRecord): void {
-    // TODO(MVP): INSERT INTO costs ...
-    throw new Error("not implemented");
+
+  insertCost(rec: CostRecord): void {
+    this.db.prepare(`
+      INSERT INTO costs (
+        id, session_id, project_id, timestamp,
+        model, input_tokens, output_tokens, cache_read, cache_write,
+        cost_input, cost_output, cost_cache_read, cost_cache_write, cost_total,
+        tool_name, task_id
+      ) VALUES (
+        @id, @sessionId, @projectId, @timestamp,
+        @model, @inputTokens, @outputTokens, @cacheRead, @cacheWrite,
+        @costInput, @costOutput, @costCacheRead, @costCacheWrite, @costTotal,
+        @toolName, @taskId
+      )
+    `).run({
+      id: rec.id,
+      sessionId: rec.sessionId,
+      projectId: rec.projectId,
+      timestamp: rec.timestamp,
+      model: rec.model,
+      inputTokens: rec.inputTokens,
+      outputTokens: rec.outputTokens,
+      cacheRead: rec.cacheRead,
+      cacheWrite: rec.cacheWrite,
+      costInput: rec.cost.input,
+      costOutput: rec.cost.output,
+      costCacheRead: rec.cost.cacheRead,
+      costCacheWrite: rec.cost.cacheWrite,
+      costTotal: rec.cost.total,
+      toolName: rec.toolName ?? null,
+      taskId: rec.taskId ?? null,
+    });
   }
 
   /** 按 session 累计 USD。 */
-  sumSessionUsd(_sessionId: string): number {
-    // TODO(MVP): SELECT SUM(cost_total) FROM costs WHERE session_id = ?
-    throw new Error("not implemented");
+  sumSessionUsd(sessionId: string): number {
+    const row = this.db
+      .prepare<[string], { total: number | null }>(
+        "SELECT COALESCE(SUM(cost_total), 0) AS total FROM costs WHERE session_id = ?",
+      )
+      .get(sessionId);
+    return row?.total ?? 0;
   }
 
-  /** 按 project + 时间窗口累计。 */
-  sumProjectUsd(_projectId: string, _since: number): number {
-    throw new Error("not implemented");
+  /** 按 project + 时间窗口累计。since = 0 表示不限制。 */
+  sumProjectUsd(projectId: string, since: number = 0): number {
+    const row = this.db
+      .prepare<[string, number], { total: number | null }>(
+        "SELECT COALESCE(SUM(cost_total), 0) AS total FROM costs WHERE project_id = ? AND timestamp >= ?",
+      )
+      .get(projectId, since);
+    return row?.total ?? 0;
   }
 
-  /** 按 model/tool 维度切片（用于 /budget report）。 */
-  aggregateBy(_dimension: "model" | "tool" | "session", _since: number): Array<{ key: string; total: number; count: number }> {
-    throw new Error("not implemented");
+  /** 按 model/tool/session 维度切片（用于 /budget report）。since = 0 表示不限制。 */
+  aggregateBy(dimension: "model" | "tool" | "session", since: number = 0): AggregateRow[] {
+    const column =
+      dimension === "model" ? "model" : dimension === "tool" ? "tool_name" : "session_id";
+    const stmt = this.db.prepare<[number], AggregateRow>(`
+      SELECT ${column} AS key, COALESCE(SUM(cost_total), 0) AS total, COUNT(*) AS count
+      FROM costs
+      WHERE timestamp >= ?
+      GROUP BY ${column}
+      ORDER BY total DESC
+    `);
+    return stmt.all(since);
   }
 
   // ── Budgets ──────────────────────────────────────────────────────────
-  setBudget(_row: Omit<BudgetRow, "updatedAt">): void {
-    throw new Error("not implemented");
+
+  setBudget(row: Omit<BudgetRow, "updatedAt">): void {
+    this.db.prepare(`
+      INSERT INTO budgets (scope, scope_id, dimension, amount, updated_at)
+      VALUES (@scope, @scopeId, @dimension, @amount, @updatedAt)
+      ON CONFLICT(scope, scope_id, dimension) DO UPDATE SET
+        amount = excluded.amount,
+        updated_at = excluded.updated_at
+    `).run({
+      scope: row.scope,
+      scopeId: row.scopeId,
+      dimension: row.dimension,
+      amount: row.amount,
+      updatedAt: Date.now(),
+    });
   }
 
-  getBudget(_scope: BudgetRow["scope"], _scopeId: string): BudgetRow[] {
-    throw new Error("not implemented");
+  getBudget(scope: BudgetRow["scope"], scopeId: string): BudgetRow[] {
+    return this.db
+      .prepare<[string, string], BudgetRow>(
+        "SELECT scope, scope_id AS scopeId, dimension, amount, updated_at AS updatedAt FROM budgets WHERE scope = ? AND scope_id = ?",
+      )
+      .all(scope, scopeId);
   }
 
-  unsetBudget(_scope: BudgetRow["scope"], _scopeId: string, _dimension?: string): void {
-    throw new Error("not implemented");
+  unsetBudget(scope: BudgetRow["scope"], scopeId: string, dimension?: string): void {
+    if (dimension) {
+      this.db
+        .prepare("DELETE FROM budgets WHERE scope = ? AND scope_id = ? AND dimension = ?")
+        .run(scope, scopeId, dimension);
+    } else {
+      this.db
+        .prepare("DELETE FROM budgets WHERE scope = ? AND scope_id = ?")
+        .run(scope, scopeId);
+    }
   }
 
   // ── Alerts ───────────────────────────────────────────────────────────
-  insertAlert(_row: AlertRow): void {
-    throw new Error("not implemented");
+
+  insertAlert(row: AlertRow): void {
+    this.db.prepare(`
+      INSERT INTO alerts (id, timestamp, level, dimension, current_value, threshold, message, resolved_action)
+      VALUES (@id, @timestamp, @level, @dimension, @currentValue, @threshold, @message, @resolvedAction)
+    `).run({
+      id: row.id,
+      timestamp: row.timestamp,
+      level: row.level,
+      dimension: row.dimension,
+      currentValue: row.currentValue,
+      threshold: row.threshold,
+      message: row.message,
+      resolvedAction: row.resolvedAction ?? null,
+    });
   }
 
-  listAlerts(_since?: number, _limit?: number): AlertRow[] {
-    throw new Error("not implemented");
+  listAlerts(since: number = 0, limit: number = 100): AlertRow[] {
+    return this.db
+      .prepare<[number, number], AlertRow>(
+        "SELECT id, timestamp, level, dimension, current_value AS currentValue, threshold, message, resolved_action AS resolvedAction FROM alerts WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT ?",
+      )
+      .all(since, limit);
   }
 
   close(): void {
-    // TODO(MVP): this.db.close()
-    throw new Error("not implemented");
+    try {
+      this.db.close();
+    } catch {
+      // 忽略重复 close / 已关闭
+    }
   }
 }

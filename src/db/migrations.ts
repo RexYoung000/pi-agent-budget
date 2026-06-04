@@ -2,8 +2,6 @@
  * SQLite schema migrations
  *
  * 设计文档：../design.md §9（手写 migration，不用 ORM）
- *
- * 状态：🚧 scaffold-only
  */
 
 import { readFileSync } from "node:fs";
@@ -21,27 +19,31 @@ export const CURRENT_VERSION = 1;
 /**
  * 跑所有未应用的 migration。
  *
- * v1: 直接 exec schema.sql（CREATE TABLE IF NOT EXISTS）
+ * v1: 直接 exec schema.sql（CREATE TABLE IF NOT EXISTS）+ 写 schema_migrations
  *
- * 后续版本（v2+）应该改成：
- *   - 维护 `schema_migrations(version, applied_at)` 表
- *   - 按 version 顺序应用 ALTER / INSERT
+ * 后续版本（v2+）应该改成按 version 顺序应用 ALTER / INSERT。
  */
 export function migrate(db: BetterSqlite3Database): void {
-  // TODO(MVP): 当 better-sqlite3 可用后启用
-  //
-  // const sql = readFileSync(SCHEMA_PATH, "utf8");
-  // db.exec(sql);
-  //
-  // db.prepare(
-  //   "CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL)"
-  // ).run();
-  // db.prepare("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, ?)").run(
-  //   CURRENT_VERSION,
-  //   Date.now(),
-  // );
-  void db;
-  void readFileSync;
-  void SCHEMA_PATH;
-  throw new Error("migrate() not implemented (scaffold-only)");
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      version INTEGER PRIMARY KEY,
+      applied_at INTEGER NOT NULL
+    );
+  `);
+
+  const applied = new Set(
+    db
+      .prepare<unknown[], { version: number }>("SELECT version FROM schema_migrations")
+      .all()
+      .map((r) => r.version),
+  );
+
+  if (!applied.has(CURRENT_VERSION)) {
+    const sql = readFileSync(SCHEMA_PATH, "utf8");
+    db.exec(sql);
+    db.prepare("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, ?)").run(
+      CURRENT_VERSION,
+      Date.now(),
+    );
+  }
 }

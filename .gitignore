@@ -20,3 +20,6 @@ Thumbs.db
 # Editor
 .vscode/
 .idea/
+
+# 临时冒烟测试脚本（开发期间用）
+src/__smoke__.ts
