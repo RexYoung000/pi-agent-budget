@@ -37,7 +37,9 @@ type SettingId =
 const ON_KEY = "on";
 const OFF_KEY = "off";
 
-function boolDisplay(v: boolean): InternalKey { return v ? ON_KEY : OFF_KEY; }
+function boolDisplay(v: boolean): string {
+  return v ? t("value.on") : t("value.off");
+}
 
 // 模式
 const MODE_COMPACT = "compact";
@@ -48,8 +50,8 @@ const MODE_KEYS = [MODE_COMPACT, MODE_FULL, MODE_CUSTOM] as const;
 function modeLabel(key: string): string {
   switch (key) {
     case MODE_COMPACT: return t("widget.config.compact");
-    case MODE_FULL: return "Full";
-    case MODE_CUSTOM: return "Custom";
+    case MODE_FULL: return t("widget.config.modeFull");
+    case MODE_CUSTOM: return t("widget.config.modeCustom");
     default: return key;
   }
 }
@@ -135,14 +137,16 @@ function buildWidgetItems(config: BudgetConfig): SettingItem[] {
   return [
     {
       id: "mode",
-      label: t("widget.config.compact"), // reused: compact/full selection
+      label: t("widget.config.mode"),
       description: [
-        `Live Preview:`,
+        `${t("widget.config.livePreview")}:`,
         `  ${previewWidget(wc, sym).split("\n").join("\n  ")}`,
         "",
-        `• ${modeLabel(MODE_COMPACT)}: cost only, one line.`,
-        `• ${modeLabel(MODE_FULL)}: model + progress bar + context window.`,
-        `• ${modeLabel(MODE_CUSTOM)}: toggle each item below.`,
+        t("widget.config.modeDescription", {
+          compact: modeLabel(MODE_COMPACT),
+          full: modeLabel(MODE_FULL),
+          custom: modeLabel(MODE_CUSTOM),
+        }),
       ].join("\n"),
       currentValue: modeLabel(currentMode),
       values: MODE_KEYS.map(modeLabel),
@@ -150,37 +154,41 @@ function buildWidgetItems(config: BudgetConfig): SettingItem[] {
     {
       id: "placement",
       label: t("widget.config.placement"),
-      description: t("widget.placement.belowEditor") + " / " + t("widget.placement.aboveEditor"),
+      description: t("widget.config.placementDescription"),
       currentValue: placementLabel(wc.placement ?? PLACEMENT_BELOW),
       values: [PLACEMENT_BELOW, PLACEMENT_ABOVE].map(placementLabel),
     },
     {
       id: "currencySymbol",
       label: t("widget.config.currency"),
-      description: `Prefix before cost numbers. Cosmetic only (pi uses USD internally).\nPreview: ${sym}0.42`,
+      description: t("widget.config.currencyDescription", { sym }),
       currentValue: sym,
       values: ["$", "US$", "¥", "€", "£"],
     },
     {
       id: "showModel",
       label: t("widget.config.showModel"),
-      description: `Show current AI model name on widget.\nPreview: ${wc.showModel !== false ? "sonnet │ $0.42/$1.00" : "$0.42/$1.00"}`,
+      description: t("widget.config.showModelDescription", {
+        on: wc.showModel !== false ? "sonnet │ $0.42/$1.00" : "$0.42/$1.00",
+      }),
       currentValue: boolDisplay(wc.showModel !== false),
-      values: [ON_KEY, OFF_KEY],
+      values: [t("value.on"), t("value.off")],
     },
     {
       id: "showProgressBar",
       label: t("widget.config.showProgress"),
-      description: `Show budget bar with █ and ░. Color changes: green → cyan → orange → red.\nPreview: ${wc.showProgressBar !== false ? "$0.42/$1.00 ████░░░░░░" : "$0.42/$1.00"}`,
+      description: t("widget.config.showProgressDescription", {
+        on: wc.showProgressBar !== false ? "$0.42/$1.00 ████░░░░░░" : "$0.42/$1.00",
+      }),
       currentValue: boolDisplay(wc.showProgressBar !== false),
-      values: [ON_KEY, OFF_KEY],
+      values: [t("value.on"), t("value.off")],
     },
     {
       id: "showContextWindow",
       label: t("widget.config.showContext"),
-      description: `Show context window usage (tokens / limit + %).\nPreview: 📊 28K/200K (14%)`,
+      description: t("widget.config.showContextDescription"),
       currentValue: boolDisplay(wc.showContextWindow !== false),
-      values: [ON_KEY, OFF_KEY],
+      values: [t("value.on"), t("value.off")],
     },
   ];
 }
@@ -193,35 +201,42 @@ function buildAllItems(config: BudgetConfig): SettingItem[] {
     {
       id: "softLimit",
       label: t("config.softLimitBehavior"),
-      description: `Triggered at ${Math.round(config.softLimitRatio * 100)}% of budget.\n${softLimitLabel(SOFT_NOTIFY)}: notification only.\n${softLimitLabel(SOFT_PAUSE)}: popup with options.`,
+      description: t("config.softLimit.description", {
+        pct: Math.round(config.softLimitRatio * 100),
+        notify: softLimitLabel(SOFT_NOTIFY),
+        pause: softLimitLabel(SOFT_PAUSE),
+      }),
       currentValue: softLimitLabel(config.onSoftLimit),
       values: [SOFT_NOTIFY, SOFT_PAUSE].map(softLimitLabel),
     },
     {
       id: "softLimitRatio",
       label: t("config.softLimitThreshold"),
-      description: "Budget % at which to warn you.",
+      description: t("config.softLimitRatio.description"),
       currentValue: `${Math.round(config.softLimitRatio * 100)}%`,
       values: ["70%", "80%", "90%"],
     },
     {
       id: "hardLimit",
       label: t("config.hardLimitBehavior"),
-      description: `Triggered at 100% of budget.\n${hardLimitLabel(HARD_PAUSE)}: popup with options.\n${hardLimitLabel(HARD_ABORT)}: reject new messages immediately.`,
+      description: t("config.hardLimit.description", {
+        pause: hardLimitLabel(HARD_PAUSE),
+        terminate: hardLimitLabel(HARD_ABORT),
+      }),
       currentValue: hardLimitLabel(config.onHardLimit),
       values: [HARD_PAUSE, HARD_ABORT].map(hardLimitLabel),
     },
     {
       id: "debug",
       label: t("config.debugLog"),
-      description: "Write detailed logs to ~/.pi/logs/. Not needed for normal use.",
+      description: t("config.debug.description"),
       currentValue: boolDisplay(!!config.debug),
-      values: [ON_KEY, OFF_KEY],
+      values: [t("value.on"), t("value.off")],
     },
     {
       id: "locale",
       label: t("config.locale"),
-      description: "Change the display language. This setting is saved to config.",
+      description: t("config.locale.description"),
       currentValue: (config.locale ?? "en") as string,
       values: getSupportedLocales().map((l) => l as string),
     },
@@ -251,13 +266,13 @@ function applyChange(config: BudgetConfig, id: string, displayValue: string): Bu
       wc.currencySymbol = displayValue;
       break;
     case "showModel":
-      wc.showModel = displayValue === ON_KEY;
+      wc.showModel = displayValue === t("value.on");
       break;
     case "showProgressBar":
-      wc.showProgressBar = displayValue === ON_KEY;
+      wc.showProgressBar = displayValue === t("value.on");
       break;
     case "showContextWindow":
-      wc.showContextWindow = displayValue === ON_KEY;
+      wc.showContextWindow = displayValue === t("value.on");
       break;
     case "softLimit":
       next.onSoftLimit = displayValue === softLimitLabel(SOFT_PAUSE) ? "pause" : "notify";
@@ -269,7 +284,7 @@ function applyChange(config: BudgetConfig, id: string, displayValue: string): Bu
       next.onHardLimit = displayValue === hardLimitLabel(HARD_ABORT) ? "abort" : "pause";
       break;
     case "debug":
-      next.debug = displayValue === ON_KEY;
+      next.debug = displayValue === t("value.on");
       break;
     case "locale":
       next.locale = displayValue;
@@ -309,9 +324,9 @@ async function openSettingsPanel(
         if (id === "mode") {
           const modeKey = MODE_KEYS.find(k => modeLabel(k) === newValue) ?? MODE_FULL;
           const patch = applyMode(modeKey);
-          list.updateValue("showModel", patch.showModel !== false ? ON_KEY : OFF_KEY);
-          list.updateValue("showProgressBar", patch.showProgressBar !== false ? ON_KEY : OFF_KEY);
-          list.updateValue("showContextWindow", patch.showContextWindow !== false ? ON_KEY : OFF_KEY);
+          list.updateValue("showModel", patch.showModel !== false ? t("value.on") : t("value.off"));
+          list.updateValue("showProgressBar", patch.showProgressBar !== false ? t("value.on") : t("value.off"));
+          list.updateValue("showContextWindow", patch.showContextWindow !== false ? t("value.on") : t("value.off"));
         }
 
         // 单项变更 → 反推 mode

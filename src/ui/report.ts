@@ -6,6 +6,9 @@
  * MVP 阶段：纯文本 + ASCII 条形图（不做 TUI 图表）
  */
 
+import { t } from "../i18n/index.js";
+import type { Translations } from "../i18n/locales.js";
+
 export type ReportRange = "today" | "week" | "month" | "all";
 
 export interface ReportInput {
@@ -33,18 +36,16 @@ export function renderBar(ratio: number, maxWidth = 12): string {
   return "█".repeat(filled) + "░".repeat(maxWidth - filled);
 }
 
-/** range 标题（中文化）。 */
+/** range 标题（i18n）。 */
 function rangeTitle(range: ReportRange): string {
-  switch (range) {
-    case "today":
-      return "Today";
-    case "week":
-      return "This Week";
-    case "month":
-      return "This Month";
-    case "all":
-      return "All Time";
-  }
+  const key: keyof Translations = `report.range.${range}` as keyof Translations;
+  return t(key);
+}
+
+/** 维度标签（i18n）。 */
+function dimLabel(dim: "model" | "tool" | "session"): string {
+  const key: keyof Translations = `report.col.${dim}` as keyof Translations;
+  return t(key);
 }
 
 /** 把时间戳转成 yyyy-mm-dd 字符串（本地时区）。 */
@@ -81,43 +82,44 @@ export function renderReport(input: ReportInput): string {
   // totals
   const avg = input.totals.sessions > 0 ? input.totals.usd / input.totals.sessions : 0;
   lines.push(
-    `Total: ${fmtUsd(input.totals.usd)}  Sessions: ${input.totals.sessions}  Requests: ${input.totals.requests}  Avg/Session: ${fmtUsd(avg)}`,
+    `${t("report.header.total")}: ${fmtUsd(input.totals.usd)}  ` +
+    `${t("report.header.sessions")}: ${input.totals.sessions}  ` +
+    `${t("report.header.requests")}: ${input.totals.requests}  ` +
+    `${t("report.header.avgPerSession")}: ${fmtUsd(avg)}`,
   );
 
   // by model
   if (input.byModel.length > 0) {
     lines.push("");
-    lines.push("By Model:");
+    lines.push(`${t("report.byModel")}:`);
     const sum = input.byModel.reduce((s, r) => s + r.total, 0);
     const maxLabel = Math.max(...input.byModel.map((r) => r.key.length), 8);
     for (const r of input.byModel) {
-      lines.push(renderRow(r.key || "(unknown)", r.total, sum, maxLabel));
+      lines.push(renderRow(r.key || t("report.unknown"), r.total, sum, maxLabel));
     }
   } else {
     lines.push("");
-    lines.push("By Model: (no data)");
+    lines.push(`${t("report.byModel")}: (${t("report.noData")})`);
   }
 
   // by tool
   if (input.byTool.length > 0) {
     lines.push("");
-    lines.push("By Tool:");
+    lines.push(`${t("report.byTool")}:`);
     const sum = input.byTool.reduce((s, r) => s + r.total, 0);
-    // tool_name 可能是 null（聚合后会得到空 key），过滤
     const visible = input.byTool.filter((r) => r.key);
     const maxLabel = Math.max(...visible.map((r) => r.key.length), 8);
     for (const r of input.byTool) {
-      if (!r.key) continue; // 跳过无 tool 的请求
+      if (!r.key) continue;
       lines.push(renderRow(r.key, r.total, sum, maxLabel));
     }
-    // 把无 tool 的累计单独显示
     const noTool = input.byTool.find((r) => !r.key);
     if (noTool) {
-      lines.push(renderRow("(no tool)", noTool.total, sum, maxLabel));
+      lines.push(renderRow(t("report.noTool"), noTool.total, sum, maxLabel));
     }
   } else {
     lines.push("");
-    lines.push("By Tool: (no data)");
+    lines.push(`${t("report.byTool")}: (${t("report.noData")})`);
   }
 
   return lines.join("\n");
@@ -133,16 +135,19 @@ export interface ByDimensionInput {
 }
 
 export function renderByDimension(input: ByDimensionInput): string {
-  const dimLabel = { model: "Model", tool: "Tool", session: "Session" }[input.dim];
+  const label = dimLabel(input.dim);
   const lines: string[] = [];
 
-  lines.push(`📊 By ${dimLabel} (${fmtDate(input.since)} → ${fmtDate(input.until)})`);
+  lines.push(`📊 ${t("report.byDim", { dim: label })} (${fmtDate(input.since)} → ${fmtDate(input.until)})`);
   lines.push("─".repeat(40));
-  lines.push(`Total: ${fmtUsd(input.totalUsd)}  Requests: ${input.rows.reduce((s, r) => s + r.count, 0)}`);
+  lines.push(
+    `${t("report.header.total")}: ${fmtUsd(input.totalUsd)}  ` +
+    `${t("report.header.requests")}: ${input.rows.reduce((s, r) => s + r.count, 0)}`,
+  );
 
   if (input.rows.length === 0) {
     lines.push("");
-    lines.push("(no data)");
+    lines.push(`(${t("report.noData")})`);
     return lines.join("\n");
   }
 
@@ -155,7 +160,7 @@ export function renderByDimension(input: ByDimensionInput): string {
     lines.push(renderRow(r.key, r.total, input.totalUsd, maxLabel));
   }
   if (noKey) {
-    lines.push(renderRow(`(no ${dimLabel.toLowerCase()})`, noKey.total, input.totalUsd, maxLabel));
+    lines.push(renderRow(`(${label.toLowerCase()}?)`, noKey.total, input.totalUsd, maxLabel));
   }
 
   return lines.join("\n");

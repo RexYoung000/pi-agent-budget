@@ -40,6 +40,7 @@ export interface Translations {
   "overview.noBudget": string;
   "overview.hintSetBudget": string;
   "overview.estRemaining": string;
+  "overview.statusOk": string;
 
   // ── report ──
   "report.title": string;
@@ -52,6 +53,21 @@ export interface Translations {
   "report.summary": string;
   "report.noData": string;
   "report.generationFailed": string;
+  "report.range.today": string;
+  "report.range.week": string;
+  "report.range.month": string;
+  "report.range.all": string;
+  "report.header.total": string;
+  "report.header.sessions": string;
+  "report.header.requests": string;
+  "report.header.avgPerSession": string;
+  "report.byModel": string;
+  "report.byTool": string;
+  "report.byDim": string;
+  "report.unknown": string;
+  "report.noTool": string;
+  "report.unknownRange": string;
+  "report.byUsage": string;
 
   // ── set / budget ──
   "set.scope.session": string;
@@ -86,6 +102,11 @@ export interface Translations {
   "config.widgetSummary.projectId.auto": string;
   "config.widgetSummary.debug.on": string;
   "config.widgetSummary.debug.off": string;
+  "config.softLimit.description": string;
+  "config.softLimitRatio.description": string;
+  "config.hardLimit.description": string;
+  "config.debug.description": string;
+  "config.locale.description": string;
 
   // ── widget config panel ──
   "widget.placement.aboveEditor": string;
@@ -100,6 +121,19 @@ export interface Translations {
   "widget.config.livePreview": string;
   "widget.config.hintNav": string;
   "widget.config.hintEdit": string;
+  "widget.config.mode": string;
+  "widget.config.modeFull": string;
+  "widget.config.modeCustom": string;
+  "widget.config.modeDescription": string;
+  "widget.config.placementDescription": string;
+  "widget.config.currencyDescription": string;
+  "widget.config.showModelDescription": string;
+  "widget.config.showProgressDescription": string;
+  "widget.config.showContextDescription": string;
+
+  // ── value labels (通用 on/off/popup 等) ──
+  "value.on": string;
+  "value.off": string;
 
   // ── alert cards ──
   "alert.softLimit.title": string;
@@ -122,6 +156,14 @@ export interface Translations {
   "export.error": string;
   "export.unsupported": string;
   "export.usage": string;
+
+  // ── command / generic errors ──
+  "cmd.budget.description": string;
+  "cmd.unknownSub": string;
+  "cmd.byUsage": string;
+  "error.sliceFailed": string;
+  "error.settingsFailed": string;
+  "error.rangeInvalid": string;
 
   // ── log messages ──
   "log.costMissing": string;
@@ -155,6 +197,7 @@ const en: Translations = {
   "overview.noBudget": "no budget",
   "overview.hintSetBudget": 'Tip: use `/budget set <usd>` to set session budget',
   "overview.estRemaining": "~{count} more similar requests estimated",
+  "overview.statusOk": "ok",
 
   "report.title": "Budget Report",
   "report.col.model": "Model",
@@ -166,6 +209,21 @@ const en: Translations = {
   "report.summary": "Summary",
   "report.noData": "No data for this range",
   "report.generationFailed": "Report generation failed",
+  "report.range.today": "Today",
+  "report.range.week": "This Week",
+  "report.range.month": "This Month",
+  "report.range.all": "All Time",
+  "report.header.total": "Total",
+  "report.header.sessions": "Sessions",
+  "report.header.requests": "Requests",
+  "report.header.avgPerSession": "Avg/Session",
+  "report.byModel": "By Model",
+  "report.byTool": "By Tool",
+  "report.byDim": "By {dim}",
+  "report.unknown": "(unknown)",
+  "report.noTool": "(no tool)",
+  "report.unknownRange": "Unknown range: {arg}. Supported: today/week/month/all",
+  "report.byUsage": "Usage: /budget by <model|tool|session> [today|week|month|all]",
 
   "set.scope.session": "session",
   "set.scope.project": "project",
@@ -198,6 +256,11 @@ const en: Translations = {
   "config.widgetSummary.projectId.auto": "Auto (git remote)",
   "config.widgetSummary.debug.on": "On",
   "config.widgetSummary.debug.off": "Off",
+  "config.softLimit.description": "Triggered at {pct}% of budget.\n{notify}: notification only.\n{pause}: popup with options.",
+  "config.softLimitRatio.description": "Budget % at which to warn you.",
+  "config.hardLimit.description": "Triggered at 100% of budget.\n{pause}: popup with options.\n{terminate}: reject new messages immediately.",
+  "config.debug.description": "Write detailed logs to ~/.pi/logs/. Not needed for normal use.",
+  "config.locale.description": "Change the display language. Saved to config.",
 
   "widget.placement.aboveEditor": "Above editor",
   "widget.placement.belowEditor": "Below input",
@@ -211,6 +274,17 @@ const en: Translations = {
   "widget.config.livePreview": "Live Preview",
   "widget.config.hintNav": "← → switch tab    ESC exit    /budget widget edit appearance",
   "widget.config.hintEdit": "/budget widget to edit interactively",
+  "widget.config.mode": "Display mode",
+  "widget.config.modeFull": "Full",
+  "widget.config.modeCustom": "Custom",
+  "widget.config.modeDescription": "• {compact}: cost only, one line.\n• {full}: model + progress bar + context window.\n• {custom}: toggle each item below.",
+  "widget.config.placementDescription": "Where the widget appears. Recommended: below input (doesn’t obscure code).",
+  "widget.config.currencyDescription": "Prefix before cost numbers. Cosmetic only (pi uses USD internally).\nPreview: {sym}0.42",
+  "widget.config.showModelDescription": "Show current AI model name on widget.\nPreview: {on}",
+  "widget.config.showProgressDescription": "Show budget bar with █ and ░. Color changes: green → cyan → orange → red.\nPreview: {on}",
+  "widget.config.showContextDescription": "Show context window usage (tokens / limit + %).\nPreview: 📊 28K/200K (14%)",
+  "value.on": "On",
+  "value.off": "Off",
 
   "alert.softLimit.title": "⚠️ Soft Limit Reached",
   "alert.softLimit.message": "Used {used} / {budget} ({pct}%)\nYou are approaching your budget limit.",
@@ -231,6 +305,12 @@ const en: Translations = {
   "export.error": "Export failed",
   "export.unsupported": "Unsupported format: {format}",
   "export.usage": "Usage: /budget export [csv|json]",
+  "cmd.budget.description": "AI cost budget manager: /budget | /budget set <amount> | /budget report [range] | /budget by <dim>",
+  "cmd.unknownSub": "Unknown sub-command: {sub}\nAvailable: widget / set / unset / report / by / config / export",
+  "cmd.byUsage": "Usage: /budget by <model|tool|session> [today|week|month|all]",
+  "error.sliceFailed": "Slice view failed",
+  "error.settingsFailed": "Settings error",
+  "error.rangeInvalid": "Invalid range",
 
   "log.costMissing": "usage.cost.total missing, skipping record (model={model})",
   "log.messageEndError": "message_end processing failed",
@@ -259,6 +339,7 @@ const zhCN: Translations = {
   "overview.noBudget": "无预算",
   "overview.hintSetBudget": "提示：用 `/budget set <usd>` 设置本会话预算",
   "overview.estRemaining": "预计还可发起 ~{count} 次类似请求",
+  "overview.statusOk": "正常",
 
   "report.title": "预算报告",
   "report.col.model": "模型",
@@ -270,6 +351,21 @@ const zhCN: Translations = {
   "report.summary": "汇总",
   "report.noData": "该时间范围无数据",
   "report.generationFailed": "报表生成失败",
+  "report.range.today": "今天",
+  "report.range.week": "本周",
+  "report.range.month": "本月",
+  "report.range.all": "全部",
+  "report.header.total": "总计",
+  "report.header.sessions": "会话数",
+  "report.header.requests": "请求数",
+  "report.header.avgPerSession": "平均/会话",
+  "report.byModel": "按模型",
+  "report.byTool": "按工具",
+  "report.byDim": "按 {dim}",
+  "report.unknown": "(未知)",
+  "report.noTool": "(无工具)",
+  "report.unknownRange": "未知范围：{arg}。支持 today/week/month/all",
+  "report.byUsage": "用法：/budget by <model|tool|session> [today|week|month|all]",
 
   "set.scope.session": "会话",
   "set.scope.project": "项目",
@@ -302,6 +398,11 @@ const zhCN: Translations = {
   "config.widgetSummary.projectId.auto": "自动（git remote）",
   "config.widgetSummary.debug.on": "开启",
   "config.widgetSummary.debug.off": "关闭",
+  "config.softLimit.description": "达到预算的 {pct}% 时触发。\n{notify}：仅在状态栏提示。\n{pause}：跳出选项让你选择。",
+  "config.softLimitRatio.description": "预算消耗到多少百分比时警告你。",
+  "config.hardLimit.description": "达到预算 100% 时触发。\n{pause}：跳出选项让你选择。\n{terminate}：直接拒绝发送新消息。",
+  "config.debug.description": "开启后会在 ~/.pi/logs/ 下记录详细运行日志。正常使用无需开启。",
+  "config.locale.description": "切换显示语言。会保存到配置文件。",
 
   "widget.placement.aboveEditor": "编辑器上方",
   "widget.placement.belowEditor": "输入框下方",
@@ -315,6 +416,17 @@ const zhCN: Translations = {
   "widget.config.livePreview": "实时预览",
   "widget.config.hintNav": "← → 切换标签    ESC 退出",
   "widget.config.hintEdit": "/budget widget 可交互编辑外观",
+  "widget.config.mode": "显示模式",
+  "widget.config.modeFull": "丰富",
+  "widget.config.modeCustom": "自定义",
+  "widget.config.modeDescription": "• {compact}：只显示一行成本数字。\n• {full}：显示模型名 + 进度条 + 上下文窗口。\n• {custom}：自由开关下面每一项。",
+  "widget.config.placementDescription": "选择 Widget 出现在编辑器上方还是输入框下面。推荐放在输入框下面，不遮挡代码。",
+  "widget.config.currencyDescription": "成本数字前面的符号。只是显示样式，不做汇率换算（pi 内部统一用 USD 计价）。\n预览：{sym}0.42",
+  "widget.config.showModelDescription": "打开后 Widget 第一行会显示当前使用的 AI 模型。\n预览：{on}",
+  "widget.config.showProgressDescription": "打开后 Widget 用 █ 和 ░ 直观展示预算消耗进度。颜色随消耗自动变化：绿→青→橙→红。\n预览：{on}",
+  "widget.config.showContextDescription": "打开后 Widget 显示当前会话的上下文使用情况。\n预览：📊 28K/200K (14%)",
+  "value.on": "开启",
+  "value.off": "关闭",
 
   "alert.softLimit.title": "⚠️ 已达软限",
   "alert.softLimit.message": "已用 {used} / {budget}（{pct}%）\n预算即将用尽。",
@@ -335,6 +447,12 @@ const zhCN: Translations = {
   "export.error": "导出失败",
   "export.unsupported": "不支持的格式：{format}",
   "export.usage": "用法：/budget export [csv|json]",
+  "cmd.budget.description": "AI 成本预算管理：/budget | /budget set <金额> | /budget report [范围] | /budget by <维度>",
+  "cmd.unknownSub": "未知子命令：{sub}\n可用：widget / set / unset / report / by / config / export",
+  "cmd.byUsage": "用法：/budget by <model|tool|session> [today|week|month|all]",
+  "error.sliceFailed": "切片生成失败",
+  "error.settingsFailed": "设置错误",
+  "error.rangeInvalid": "范围无效",
 
   "log.costMissing": "usage.cost.total 缺失，跳过记录（model={model}）",
   "log.messageEndError": "message_end 处理失败",
@@ -363,6 +481,7 @@ const ja: Translations = {
   "overview.noBudget": "予算なし",
   "overview.hintSetBudget": "ヒント: `/budget set <usd>` でセッション予算を設定",
   "overview.estRemaining": "あと約{count}回の類似リクエストが可能",
+  "overview.statusOk": "正常",
 
   "report.title": "予算レポート",
   "report.col.model": "モデル",
@@ -374,6 +493,21 @@ const ja: Translations = {
   "report.summary": "サマリー",
   "report.noData": "この期間のデータはありません",
   "report.generationFailed": "レポート生成に失敗",
+  "report.range.today": "今日",
+  "report.range.week": "今週",
+  "report.range.month": "今月",
+  "report.range.all": "全期間",
+  "report.header.total": "合計",
+  "report.header.sessions": "セッション",
+  "report.header.requests": "リクエスト",
+  "report.header.avgPerSession": "平均/セッション",
+  "report.byModel": "モデル別",
+  "report.byTool": "ツール別",
+  "report.byDim": "{dim}別",
+  "report.unknown": "(不明)",
+  "report.noTool": "(ツールなし)",
+  "report.unknownRange": "不明な範囲: {arg}。対応: today/week/month/all",
+  "report.byUsage": "使い方: /budget by <model|tool|session> [today|week|month|all]",
 
   "set.scope.session": "セッション",
   "set.scope.project": "プロジェクト",
@@ -406,6 +540,11 @@ const ja: Translations = {
   "config.widgetSummary.projectId.auto": "自動（git remote）",
   "config.widgetSummary.debug.on": "オン",
   "config.widgetSummary.debug.off": "オフ",
+  "config.softLimit.description": "予算の {pct}% でトリガー。\n{notify}: 通知のみ。\n{pause}: 選択肢のポップアップ。",
+  "config.softLimitRatio.description": "警告を出す予算の消費割合。",
+  "config.hardLimit.description": "予算 100% でトリガー。\n{pause}: 選択肢のポップアップ。\n{terminate}: 新しいメッセージを即座に拒否。",
+  "config.debug.description": "〜/.pi/logs/ に詳細ログを書き出します。通常使用では不要。",
+  "config.locale.description": "表示言語を切替えます。設定に保存されます。",
 
   "widget.placement.aboveEditor": "エディタ上部",
   "widget.placement.belowEditor": "入力欄下部",
@@ -419,6 +558,17 @@ const ja: Translations = {
   "widget.config.livePreview": "ライブプレビュー",
   "widget.config.hintNav": "← → タブ切替    ESC 終了",
   "widget.config.hintEdit": "/budget widget で対話的に編集",
+  "widget.config.mode": "表示モード",
+  "widget.config.modeFull": "フル",
+  "widget.config.modeCustom": "カスタム",
+  "widget.config.modeDescription": "• {compact}: コストのみ 1行。\n• {full}: モデル + プログレスバー + コンテキストウィンドウ。\n• {custom}: 各項目を個別に切替。",
+  "widget.config.placementDescription": "Widget を表示する位置。推奨: 入力欄の下（コードを隠さない）。",
+  "widget.config.currencyDescription": "コストの前に付く記号。表示のみ（pi は内部的に USD 使用）。\nプレビュー: {sym}0.42",
+  "widget.config.showModelDescription": "Widget に現在の AI モデル名を表示。\nプレビュー: {on}",
+  "widget.config.showProgressDescription": "Widget に █ と ░ で予算バーを表示。色変化: 緑→シアン→オレンジ→赤。\nプレビュー: {on}",
+  "widget.config.showContextDescription": "コンテキストウィンドウの使用状況を表示。\nプレビュー: 📊 28K/200K (14%)",
+  "value.on": "オン",
+  "value.off": "オフ",
 
   "alert.softLimit.title": "⚠️ ソフトリミット到達",
   "alert.softLimit.message": "使用量 {used} / {budget}（{pct}%）\n予算上限に近づいています。",
@@ -439,6 +589,12 @@ const ja: Translations = {
   "export.error": "エクスポート失敗",
   "export.unsupported": "未対応の形式: {format}",
   "export.usage": "使い方: /budget export [csv|json]",
+  "cmd.budget.description": "AI コスト予算管理: /budget | /budget set <金額> | /budget report [範囲] | /budget by <次元>",
+  "cmd.unknownSub": "不明なサブコマンド: {sub}\n対応: widget / set / unset / report / by / config / export",
+  "cmd.byUsage": "使い方: /budget by <model|tool|session> [today|week|month|all]",
+  "error.sliceFailed": "スライス生成に失敗",
+  "error.settingsFailed": "設定エラー",
+  "error.rangeInvalid": "無効な範囲",
 
   "log.costMissing": "usage.cost.total が見つかりません（model={model}）",
   "log.messageEndError": "message_end 処理エラー",
@@ -467,6 +623,7 @@ const ko: Translations = {
   "overview.noBudget": "예산 없음",
   "overview.hintSetBudget": "팁: `/budget set <usd>`로 세션 예산 설정",
   "overview.estRemaining": "약 {count}회 유사 요청 가능",
+  "overview.statusOk": "정상",
 
   "report.title": "예산 리포트",
   "report.col.model": "모델",
@@ -478,6 +635,21 @@ const ko: Translations = {
   "report.summary": "요약",
   "report.noData": "해당 기간 데이터 없음",
   "report.generationFailed": "리포트 생성 실패",
+  "report.range.today": "오늘",
+  "report.range.week": "이번 주",
+  "report.range.month": "이번 달",
+  "report.range.all": "전체 기간",
+  "report.header.total": "합계",
+  "report.header.sessions": "세션",
+  "report.header.requests": "요청",
+  "report.header.avgPerSession": "평균/세션",
+  "report.byModel": "모델별",
+  "report.byTool": "도구별",
+  "report.byDim": "{dim}별",
+  "report.unknown": "(알 수 없음)",
+  "report.noTool": "(도구 없음)",
+  "report.unknownRange": "알 수 없는 범위: {arg}. 지원: today/week/month/all",
+  "report.byUsage": "사용법: /budget by <model|tool|session> [today|week|month|all]",
 
   "set.scope.session": "세션",
   "set.scope.project": "프로젝트",
@@ -510,6 +682,11 @@ const ko: Translations = {
   "config.widgetSummary.projectId.auto": "자동 (git remote)",
   "config.widgetSummary.debug.on": "켜짐",
   "config.widgetSummary.debug.off": "꺼짐",
+  "config.softLimit.description": "예산의 {pct}%에서 트리거.\n{notify}: 알림만.\n{pause}: 선택 팝업.",
+  "config.softLimitRatio.description": "경고를 낼 예산 소비 비율.",
+  "config.hardLimit.description": "예산 100%에서 트리거.\n{pause}: 선택 팝업.\n{terminate}: 새 메시지 즉시 거부.",
+  "config.debug.description": " ~/.pi/logs/에 상세 로그를 기록합니다. 일반 사용시 불필요.",
+  "config.locale.description": "표시 언어를 변경합니다. 설정에 저장됩니다.",
 
   "widget.placement.aboveEditor": "에디터 위",
   "widget.placement.belowEditor": "입력창 아래",
@@ -523,6 +700,17 @@ const ko: Translations = {
   "widget.config.livePreview": "실시간 미리보기",
   "widget.config.hintNav": "← → 탭 전환    ESC 종료",
   "widget.config.hintEdit": "/budget widget으로 대화식 편집",
+  "widget.config.mode": "표시 모드",
+  "widget.config.modeFull": "풀",
+  "widget.config.modeCustom": "사용자 정의",
+  "widget.config.modeDescription": "• {compact}: 비용만 한 줄.\n• {full}: 모델 + 진행률 + 컨텍스트 창.\n• {custom}: 아래 항목을 개별적으로 토글.",
+  "widget.config.placementDescription": "Widget 표시 위치. 추천: 입력창 아래 (코드 가리지 않음).",
+  "widget.config.currencyDescription": "비용 앞에 붙는 기호. 표시 전용 (pi는 내부적으로 USD 사용).\n미리보기: {sym}0.42",
+  "widget.config.showModelDescription": "현재 AI 모델명을 Widget에 표시.\n미리보기: {on}",
+  "widget.config.showProgressDescription": "Widget에 █, ░로 예산 진행률 표시. 색 변화: 녹→시안→주→적.\n미리보기: {on}",
+  "widget.config.showContextDescription": "컨텍스트 창 사용량 표시.\n미리보기: 📊 28K/200K (14%)",
+  "value.on": "켬",
+  "value.off": "끔",
 
   "alert.softLimit.title": "⚠️ 소프트 리밋 도달",
   "alert.softLimit.message": "사용량 {used} / {budget} ({pct}%)\n예산 한도에 근접했습니다.",
@@ -543,6 +731,12 @@ const ko: Translations = {
   "export.error": "내보내기 실패",
   "export.unsupported": "지원하지 않는 형식: {format}",
   "export.usage": "사용법: /budget export [csv|json]",
+  "cmd.budget.description": "AI 비용 예산 관리: /budget | /budget set <금액> | /budget report [범위] | /budget by <차원>",
+  "cmd.unknownSub": "알 수 없는 하위 명령: {sub}\n지원: widget / set / unset / report / by / config / export",
+  "cmd.byUsage": "사용법: /budget by <model|tool|session> [today|week|month|all]",
+  "error.sliceFailed": "슬라이스 생성 실패",
+  "error.settingsFailed": "설정 오류",
+  "error.rangeInvalid": "잘못된 범위",
 
   "log.costMissing": "usage.cost.total 누락, 기록 건너뜀 (model={model})",
   "log.messageEndError": "message_end 처리 오류",

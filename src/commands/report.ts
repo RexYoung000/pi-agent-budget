@@ -17,6 +17,7 @@
 import type { ExtensionUIContext, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 
 import type { BudgetDb } from "../db/client.js";
+import { t } from "../i18n/index.js";
 import {
   renderReport,
   renderByDimension,
@@ -38,7 +39,7 @@ export function parseRange(arg: string | undefined): ReportRange {
     case "all":
       return "all";
     default:
-      throw new Error(`Unknown range: ${arg}. Supported: today/week/month/all`);
+      throw new Error(t("report.unknownRange", { arg: String(arg) }));
   }
 }
 

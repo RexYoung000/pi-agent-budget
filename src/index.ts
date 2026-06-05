@@ -335,7 +335,7 @@ export default function (pi: ExtensionAPI) {
   // Commands: /budget（无参数 = 总览） / /budget set / /budget unset
   // ────────────────────────────────────────────────────────────────────────
   pi.registerCommand("budget", {
-    description: "AI cost budget manager: /budget | /budget set <amount> | /budget report [range]",
+    description: t("cmd.budget.description"),
     handler: async (args, ctx) => {
       const trimmed = (args ?? "").trim();
 
@@ -377,7 +377,7 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      const help = `Unknown sub-command: ${sub}\nAvailable: widget / set / unset / report / by / config / export`;
+      const help = t("cmd.unknownSub", { sub: String(sub) });
       ctx.ui.notify(help, "warning");
     },
   });
@@ -425,9 +425,9 @@ export default function (pi: ExtensionAPI) {
     const wc = widgetConfig();
     const widgetSummary = [
       `${t("widget.config.placement")}: ${wc.placement === "aboveEditor" ? t("widget.placement.aboveEditor") : t("widget.placement.belowEditor")}`,
-      `${t("widget.config.showModel")}: ${wc.showModel !== false ? "On" : "Off"}`,
-      `${t("widget.config.showProgress")}: ${wc.showProgressBar !== false ? "On" : "Off"}`,
-      `${t("widget.config.showContext")}: ${wc.showContextWindow !== false ? "On" : "Off"}`,
+      `${t("widget.config.showModel")}: ${wc.showModel !== false ? t("value.on") : t("value.off")}`,
+      `${t("widget.config.showProgress")}: ${wc.showProgressBar !== false ? t("value.on") : t("value.off")}`,
+      `${t("widget.config.showContext")}: ${wc.showContextWindow !== false ? t("value.on") : t("value.off")}`,
       `${t("widget.config.currency")}: ${wc.currencySymbol ?? "$"}`,
       "",
       `💡 ${t("dashboard.hint")}`,
@@ -435,9 +435,9 @@ export default function (pi: ExtensionAPI) {
 
     // 4. 配置摘要
     const configSummary = [
-      `${t("config.softLimitBehavior")}: ${config.onSoftLimit === "pause" ? "Popup" : "Notify"}`,
+      `${t("config.softLimitBehavior")}: ${config.onSoftLimit === "pause" ? t("config.widgetSummary.onSoftLimit.pause") : t("config.widgetSummary.onSoftLimit.notify")}`,
       `${t("config.softLimitThreshold")}: ${Math.round(config.softLimitRatio * 100)}%`,
-      `${t("config.hardLimitBehavior")}: ${config.onHardLimit === "abort" ? "Terminate" : "Popup"}`,
+      `${t("config.hardLimitBehavior")}: ${config.onHardLimit === "abort" ? t("config.widgetSummary.onHardLimit.terminate") : t("config.widgetSummary.onHardLimit.pause")}`,
       `${t("config.projectId")}: ${config.projectIdOverride ? t("config.custom") : t("config.auto")}`,
       `${t("config.debugLog")}: ${config.debug ? t("config.widgetSummary.debug.on") : t("config.widgetSummary.debug.off")}`,
       `${t("config.locale")}: ${config.locale ?? "en"}`,
@@ -524,10 +524,7 @@ export default function (pi: ExtensionAPI) {
     const parts = args.trim().split(/\s+/);
     const dim = parseByDim(parts[0]);
     if (!dim) {
-      ctx.ui.notify(
-        "Usage: /budget by <model|tool|session> [today|week|month|all]",
-        "warning",
-      );
+      ctx.ui.notify(t("cmd.byUsage"), "warning");
       return;
     }
     let range: ReportRange;
@@ -540,7 +537,7 @@ export default function (pi: ExtensionAPI) {
       const db = await getDb();
       await runBy(db, dim, range, ctx);
     } catch (err) {
-      ctx.ui.notify(`Slice view failed: ${(err as Error).message}`, "error");
+      ctx.ui.notify(t("error.sliceFailed") + `: ${(err as Error).message}`, "error");
     }
   }
 
@@ -549,7 +546,7 @@ export default function (pi: ExtensionAPI) {
       config = await openFullSettings(config, ctx.ui, (c) => { config = c; });
       refreshWidgetAfterConfig(ctx);
     } catch (err) {
-      ctx.ui.notify(`Settings error: ${(err as Error).message}`, "error");
+      ctx.ui.notify(t("error.settingsFailed") + `: ${(err as Error).message}`, "error");
     }
   }
 
@@ -558,7 +555,7 @@ export default function (pi: ExtensionAPI) {
       config = await openWidgetSettings(config, ctx.ui, (c) => { config = c; });
       refreshWidgetAfterConfig(ctx);
     } catch (err) {
-      ctx.ui.notify(`Settings error: ${(err as Error).message}`, "error");
+      ctx.ui.notify(t("error.settingsFailed") + `: ${(err as Error).message}`, "error");
     }
   }
 
