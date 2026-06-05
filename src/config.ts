@@ -11,7 +11,7 @@ import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from "
 
 export const CONFIG_PATH = join(homedir(), ".pi", "budget.json");
 
-/** design.md §4.1 + MVP 第 5 项逃生口 */
+/** design.md §4.1 + MVP 第 5 项逃生口 + widget 可配置体系 */
 export interface BudgetConfig {
   session?: { usd?: number; tokens?: number; minutes?: number };
   project?: { usdPerDay?: number; usdPerWeek?: number };
@@ -29,7 +29,35 @@ export interface BudgetConfig {
 
   /** 调试日志开关。开启后写入 ~/.pi/logs/budget.log。 */
   debug?: boolean;
+
+  /** widget 外观 & 行为。 */
+  widget?: WidgetConfig;
 }
+
+/** widget 可配置项 */
+export interface WidgetConfig {
+  /** 显示位置：编辑器上方（默认）还是下方（输入框下面） */
+  placement?: "aboveEditor" | "belowEditor";
+  /** 极简模式：只显示 $0.42/$1.00，不显示模型/进度条/上下文 */
+  compact?: boolean;
+  /** 显示当前模型名 */
+  showModel?: boolean;
+  /** 显示进度条 */
+  showProgressBar?: boolean;
+  /** 显示上下文窗口用量（📊 tokens/contextWindow percent%） */
+  showContextWindow?: boolean;
+  /** 货币符号前缀，默认 "$"（仅显示，不做汇率换算） */
+  currencySymbol?: string;
+}
+
+export const DEFAULT_WIDGET_CONFIG: WidgetConfig = {
+  placement: "belowEditor",
+  compact: false,
+  showModel: true,
+  showProgressBar: true,
+  showContextWindow: true,
+  currencySymbol: "$",
+};
 
 export const DEFAULT_CONFIG: BudgetConfig = {
   onSoftLimit: "notify",

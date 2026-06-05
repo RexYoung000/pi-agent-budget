@@ -1,26 +1,31 @@
 /**
  * 状态栏 widget
  *
- * 设计文档：../../design.md §5.1
+ * 设计文档：../../design.md §5.1 + widget 可配置体系
  *
- * 渲染样例（带颜色）：
- *   ◉ claude-sonnet-4-5 │ $0.42/$1.00 ████░░░░░░░░
- *
- * 颜色映射：
- *   < 60%       success（绿）
- *   60–80%      accent（青）
- *   80–100%     warning（橙黄）
- *   > 100%      error（红）
+ * 支持：
+ *   - 放置位置：aboveEditor / belowEditor
+ *   - compact 模式：只显示成本
+ *   - 可选：模型名、进度条、上下文窗口
+ *   - 颜色随预算消耗变化
  */
 
 import type { ExtensionUIContext, Theme } from "@earendil-works/pi-coding-agent";
+
+import type { WidgetConfig } from "../config.js";
 
 export type WidgetLevel = "ok" | "warn" | "soft" | "hard";
 
 export interface WidgetState {
   model: string;
   usedUsd: number;
-  budgetUsd: number; // 0 表示未设置预算，按 "ok" 处理（不显示分母/进度条）
+  budgetUsd: number;
+  /** 上下文窗口使用情况（来自 pi getContextUsage） */
+  context?: {
+    tokens: number | null;
+    contextWindow: number;
+    percent: number | null;
+  };
 }
 
 /** 根据 used/budget 算出等级。 */
@@ -41,84 +46,127 @@ const LEVEL_COLOR: Record<WidgetLevel, "success" | "accent" | "warning" | "error
   hard: "error",
 };
 
-/** 简化模型名展示：取最后一段。 */
 export function shortModelName(model: string): string {
   if (!model) return "?";
-  const last = model.split("/").pop() ?? model;
-  return last;
+  return model.split("/").pop() ?? model;
 }
 
-/**
- * 渲染进度条：
- *   ratio 0.33, width 12 → "████░░░░░░░░"
- *   ratio > 1            → 仍按 100% 渲染，颜色由外部决定
- */
 export function renderProgressBar(ratio: number, width: number): string {
   const clamped = Math.max(0, Math.min(1, ratio));
   const filled = Math.round(clamped * width);
-  const empty = width - filled;
-  return "█".repeat(filled) + "░".repeat(empty);
+  return "█".repeat(filled) + "░".repeat(width - filled);
 }
 
-/**
- * 用主题颜色渲染一行 widget 内容。
- * theme 可选 —— 缺省（例如单元测试时）退化为纯文本。
- */
-export function renderWidgetLine(state: WidgetState, theme?: Theme): string {
-  const model = shortModelName(state.model);
+/** 渲染上下文窗口：📊 28K/200K (14%) */
+export function renderContextLine(ctx: NonNullable<WidgetState["context"]>): string {
+  const { tokens, contextWindow, percent } = ctx;
+  const tokStr = tokens != null ? fmtContextTokens(tokens) : "?";
+  const winStr = fmtContextTokens(contextWindow);
+  const pctStr = percent != null ? ` (${Math.round(percent)}%)` : "";
+  return `📊 ${tokStr}/${winStr}${pctStr}`;
+}
+
+function fmtContextTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
+/** 核心：生成 widget 行列表（供 setWidget 消费） */
+export function renderWidgetLines(state: WidgetState, wc: WidgetConfig, theme?: Theme): string[] {
   const level = computeLevel(state);
   const color = LEVEL_COLOR[level];
+  const sym = wc.currencySymbol ?? "$";
 
-  // 圆点指示等级
   const dot = level === "hard" ? "🔴" : level === "soft" ? "🟠" : level === "warn" ? "🟡" : "🟢";
 
-  if (!state.budgetUsd || state.budgetUsd <= 0) {
-    // 无预算：只显示已用
-    const core = `${dot} ${model} │ $${state.usedUsd.toFixed(2)}`;
-    if (!theme) return core;
-    return theme.fg(color, core);
+  // compact 模式：只显示成本
+  if (wc.compact) {
+    const parts: string[] = [];
+    parts.push(dot);
+    parts.push(`${sym}${state.usedUsd.toFixed(2)}`);
+    if (state.budgetUsd > 0) {
+      parts.push(`/${sym}${state.budgetUsd.toFixed(2)}`);
+    }
+    return [maybeColor(theme, color, parts.join(" "))];
   }
 
-  const ratio = state.usedUsd / state.budgetUsd;
-  const bar = renderProgressBar(ratio, 12);
-  const core = `${dot} ${model} │ $${state.usedUsd.toFixed(2)}/$${state.budgetUsd.toFixed(2)} ${bar}`;
-  if (!theme) return core;
-  return theme.fg(color, core);
+  // 完整模式：逐元素拼接
+  const parts: string[] = [];
+
+  // 模型名
+  if (wc.showModel !== false) {
+    parts.push(shortModelName(state.model));
+  } else {
+    parts.push(dot);
+  }
+
+  // 成本
+  const costParts: string[] = [];
+  if (wc.showModel === false) costParts.push(dot);
+  costParts.push(`${sym}${state.usedUsd.toFixed(2)}`);
+  if (state.budgetUsd > 0) {
+    costParts.push(`/${sym}${state.budgetUsd.toFixed(2)}`);
+    // 进度条
+    if (wc.showProgressBar !== false) {
+      const bar = renderProgressBar(state.usedUsd / state.budgetUsd, 10);
+      costParts.push(bar);
+    }
+  }
+  parts.push(costParts.join(" "));
+
+  const mainLine = maybeColor(theme, color, parts.join(" │ "));
+  const lines = [mainLine];
+
+  // 上下文窗口（第二行）
+  if (wc.showContextWindow && state.context) {
+    const ctxLine = renderContextLine(state.context);
+    lines.push(maybeColor(theme, "dim", `  ${ctxLine}`));
+  }
+
+  return lines;
 }
 
-/**
- * 注册 / 注销 widget 的回调句柄，便于在 message_end / model_select 后调用 setWidget。
- *
- * 设计：直接接 ctx.ui 形状的对象，类型对齐 pi 实际签名（重载 setWidget）。
- */
+function maybeColor(theme: Theme | undefined, color: string, text: string): string {
+  if (!theme) return text;
+  return theme.fg(color as Parameters<Theme["fg"]>[0], text);
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Widget 注册 / 刷新句柄
+// ──────────────────────────────────────────────────────────────────
+
 export interface WidgetRefresher {
-  /** 用新 state 重绘。state = null 表示清空 widget（例如 session 结束）。 */
   refresh(state: WidgetState | null): void;
-  /** 清空 widget。 */
   clear(): void;
 }
 
 export function createWidgetRenderer(opts: {
   ui: Pick<ExtensionUIContext, "setWidget">;
+  config?: WidgetConfig;
 }): WidgetRefresher {
+  const wc = opts.config ?? {};
+  const placement = wc.placement === "aboveEditor" ? "aboveEditor" : "belowEditor";
+
   return {
     refresh(state) {
       if (!state) {
         opts.ui.setWidget("pi-budget", undefined);
         return;
       }
-      // 用 renderer 形式才能拿到 theme；pi 文档允许 (tui, theme) => Component
-      opts.ui.setWidget("pi-budget", (_tui, theme) => {
-        const line = renderWidgetLine(state, theme);
-        return {
-          render(_width: number) {
-            return [line];
-          },
-          invalidate() {
-            // widget 是元状态驱动，不需要缓存失效
-          },
-        };
-      });
+      opts.ui.setWidget(
+        "pi-budget",
+        (_tui, theme) => {
+          const lines = renderWidgetLines(state, wc, theme);
+          return {
+            render(_width: number) {
+              return lines;
+            },
+            invalidate() {},
+          };
+        },
+        { placement },
+      );
     },
     clear() {
       opts.ui.setWidget("pi-budget", undefined);

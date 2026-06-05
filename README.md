@@ -2,7 +2,7 @@
 
 > Pi 扩展：让 AI coding 从"不知不觉烧钱"变成"在预算内放心跑"。
 >
-> 状态：🚧 脚手架阶段（scaffold-only），尚未实现任何业务逻辑。
+> 状态：✅ MVP 完整可用（5 项全部完成）
 
 给 agent / plan / vibe 三种 AI coding 范式提供统一的**成本可观测、控制、与优化**能力。详见 [`design.md`](./design.md)。
 
@@ -116,33 +116,70 @@ pi-budget/
 
 ---
 
-## MVP 范围（待实现）
+## MVP 范围（已完成 ✅）
 
-参见 [`design.md`](./design.md) §8。第一版只做这 4 件事：
+参见 [`design.md`](./design.md) §8。第一版做这 5 件事：
 
-1. ☐ 监听 `message_end`，SQLite 累计成本
-2. ☐ 状态栏 widget 显示 `$used/$budget`
-3. ☐ `/budget set N` + 软/硬限弹窗
-4. ☐ `/budget report` 简单文本报表
+1. ✅ 监听 `message_end`，SQLite 累计成本
+2. ✅ 状态栏 widget 显示 `$used/$budget`（默认输入框下方）
+3. ✅ `/budget set N` + 软/硬限弹窗
+4. ✅ `/budget report` 简单文本报表（today/week/month + by model/tool/session）
+5. ✅ 边缘情况兜底（projectId 手填、model_select 联动、cost 缺失不崩、config 默认值）
+
+**额外已实现**（超出 MVP）：
+- ✅ widget 可配置体系（位置/内容/compact 模式/上下文窗口/货币符号）
+- ✅ `/budget config` TUI 配置界面
+- ✅ 上下文窗口用量显示（📊 tokens/contextWindow percent%，自动跟随模型）
+- ✅ widget 默认在输入框下方
 
 ---
 
-## 命令清单（设计）
+## 命令清单
 
 ```
 /budget                       # 当前会话实时概览
-/budget set <amount>          # 设置本会话预算
-/budget set project <amount>  # 设置项目日预算
-/budget unset [scope]         # 清除预算
-/budget report [range]        # 完整报表（today / week / month）
-/budget by <dim>              # 维度切片（tool / model / session）
-/budget downgrade [model|off] # 手动降级当前会话
-/budget reset                 # 重置当前会话计数
-/budget config                # 打开配置 UI
-/budget export [format]       # 导出 CSV / JSON
-/budget projects              # 按项目对比成本
-/budget alerts                # 查看历史告警
+/budget set <amount>          # 设置本会话预算        例：/budget set 2.00
+/budget set project <amount>  # 设置项目日预算        例：/budget set project 10
+/budget unset [scope]         # 清除预算（session/project/global）
+/budget report [range]        # 完整报表              例：/budget report today / week / month
+/budget by <dim> [range]      # 维度切片              例：/budget by tool / by model / by session
+/budget config                # 打开 TUI 配置界面
 ```
+
+## 配置说明
+
+可通过 `/budget config`（推荐）或手编辑 `~/.pi/budget.json` 自定义：
+
+```json
+{
+  "session": { "usd": 1.00 },
+  "onSoftLimit": "notify",
+  "onHardLimit": "pause",
+  "softLimitRatio": 0.8,
+  "hardLimitRatio": 1.0,
+  "widget": {
+    "placement": "belowEditor",
+    "compact": false,
+    "showModel": true,
+    "showProgressBar": true,
+    "showContextWindow": true,
+    "currencySymbol": "$"
+  },
+  "debug": false
+}
+```
+
+| 配置项 | 说明 | 默认值 |
+|---|---|---|
+| `widget.placement` | Widget 位置 | `belowEditor` |
+| `widget.compact` | 极简模式（只显示成本） | `false` |
+| `widget.showModel` | 是否显示模型名 | `true` |
+| `widget.showProgressBar` | 是否显示进度条 | `true` |
+| `widget.showContextWindow` | 显示上下文窗口用量 | `true` |
+| `widget.currencySymbol` | 货币符号（仅显示，不换算） | `"$"` |
+| `onSoftLimit` | 软限行为 | `"notify"` |
+| `softLimitRatio` | 软限触发比例 | `0.8` |
+| `debug` | 调试日志 | `false` |
 
 ---
 

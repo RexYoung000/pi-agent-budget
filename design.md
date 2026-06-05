@@ -156,13 +156,22 @@ pi.on("message_end", async (event, ctx) => {
 > `lastToolName(message)`：`message_end` 触发时 assistant message 已落盘完整 content，
 > 直接遍历 `content[]` 取最后一个 `{type:"tool_use"}` 块的 `name` 即可，无需"推断"。
 
-**状态栏 widget**（用 `ctx.ui.setWidget("pi-budget", lines)` 注册到 editor 上方，扩展自己控制刷新）：
+**状态栏 widget**（用 `ctx.ui.setWidget("pi-budget", lines, {placement})` 注册，默认在编辑器下方）：
 
 ```
 ┌──────────────────────────────────────────────┐
 │ ◉ claude-sonnet-4.5 │ $0.42/$1.00 ████░░ │  │
+│   📊 28K/200K (14%)                          │
 └──────────────────────────────────────────────┘
 ```
+
+**可配置项**（通过 `/budget config` 或手编辑 `~/.pi/budget.json`）：
+- `placement`: `"aboveEditor"` | `"belowEditor"`（默认下方）
+- `compact`: true 时只显示 `$0.42/$1.00`（极简模式）
+- `showModel`: 是否显示模型名
+- `showProgressBar`: 是否显示进度条
+- `showContextWindow`: 是否显示上下文窗口用量（📊 28K/200K (14%)，数据来自 `ctx.getContextUsage()`，自动跟随当前模型）
+- `currencySymbol`: 货币符号（默认 `"$"`，纯显示不做汇率换算）
 
 颜色编码：
 - 绿色：< 60% 预算

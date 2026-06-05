@@ -17,7 +17,7 @@ import type { ExtensionAPI, ExtensionUIContext, ExtensionCommandContext } from "
 import { BudgetDb } from "./db/client.js";
 import { createTracker, lastToolName } from "./core/tracker.js";
 import { getProjectId } from "./core/project.js";
-import { loadConfig, saveConfig, type BudgetConfig } from "./config.js";
+import { loadConfig, saveConfig, type BudgetConfig, DEFAULT_WIDGET_CONFIG } from "./config.js";
 import { createWidgetRenderer, type WidgetState } from "./ui/widget.js";
 import { checkSessionLimit } from "./core/limits.js";
 import { showSoftLimitCard, showHardLimitCard, askNewBudget } from "./ui/alert-card.js";
@@ -30,6 +30,7 @@ import {
 } from "./commands/set.js";
 import { renderOverview, type OverviewInput } from "./commands/overview.js";
 import { parseRange, parseByDim, runReport, runBy, type ReportRange } from "./commands/report.js";
+import { openConfig } from "./commands/config.js";
 
 export default function (pi: ExtensionAPI) {
   // ────────────────────────────────────────────────────────────────────────
@@ -79,19 +80,27 @@ export default function (pi: ExtensionAPI) {
   type UiLike = { setWidget: Parameters<Parameters<typeof pi.on>[1]>[1]["ui"]["setWidget"] };
   let uiRef: UiLike | null = null;
 
+  /** 合并默认值，让用户不用手配所有字段。 */
+  function widgetConfig(): NonNullable<BudgetConfig["widget"]> {
+    return { ...DEFAULT_WIDGET_CONFIG, ...(config.widget ?? {}) };
+  }
+
   function refreshWidget(
     ui: UiLike,
-    ctx: { model?: { name?: string; id?: string } | null },
+    ctx: { model?: { name?: string; id?: string } | null; getContextUsage?: () => { tokens: number | null; contextWindow: number; percent: number | null } | undefined },
     usedUsd: number,
   ): void {
     const modelDisplay = ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay ?? "?";
     currentModelDisplay = modelDisplay;
+    const wc = widgetConfig();
+    const context = ctx.getContextUsage?.();
     const state: WidgetState = {
       model: modelDisplay,
       usedUsd,
       budgetUsd: config.session?.usd ?? 0,
+      context: context ? { tokens: context.tokens, contextWindow: context.contextWindow, percent: context.percent } : undefined,
     };
-    createWidgetRenderer({ ui }).refresh(state);
+    createWidgetRenderer({ ui, config: wc }).refresh(state);
   }
 
   // ────────────────────────────────────────────────────────────────────────
@@ -350,8 +359,12 @@ export default function (pi: ExtensionAPI) {
         await runByCommand(restStr, ctx);
         return;
       }
+      if (sub === "config") {
+        await runConfigCommand(ctx);
+        return;
+      }
 
-      const help = `未知子命令: ${sub}\n支持的子命令：set / unset / report / by`;
+      const help = `未知子命令: ${sub}\n支持的子命令：set / unset / report / by / config`;
       ctx.ui.notify(help, "warning");
     },
   });
@@ -459,6 +472,25 @@ export default function (pi: ExtensionAPI) {
       await runBy(db, dim, range, ctx);
     } catch (err) {
       ctx.ui.notify(`切片生成失败: ${(err as Error).message}`, "error");
+    }
+  }
+
+  async function runConfigCommand(ctx: ExtensionCommandContext): Promise<void> {
+    try {
+      const newConfig = await openConfig(config, ctx.ui);
+      config = newConfig;
+      // 配置变了立刻刷新 widget
+      if (uiRef) {
+        const sessionId = getSessionId(ctx);
+        let usedUsd = 0;
+        try {
+          const db = await getDb();
+          usedUsd = createTracker(db).sessionUsd(sessionId);
+        } catch { /* ignore */ }
+        refreshWidget(uiRef, ctx, usedUsd);
+      }
+    } catch (err) {
+      ctx.ui.notify(`配置界面错误: ${(err as Error).message}`, "error");
     }
   }
 
