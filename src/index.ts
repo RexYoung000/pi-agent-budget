@@ -30,7 +30,7 @@ import {
 } from "./commands/set.js";
 import { renderOverview, type OverviewInput } from "./commands/overview.js";
 import { parseRange, parseByDim, runReport, runBy, type ReportRange } from "./commands/report.js";
-import { openConfig } from "./commands/config.js";
+import { openConfigTUI } from "./commands/config.js";
 
 export default function (pi: ExtensionAPI) {
   // ────────────────────────────────────────────────────────────────────────
@@ -477,7 +477,7 @@ export default function (pi: ExtensionAPI) {
 
   async function runConfigCommand(ctx: ExtensionCommandContext): Promise<void> {
     try {
-      const newConfig = await openConfig(config, ctx.ui);
+      const newConfig = await openConfigTUI(config, ctx.ui);
       config = newConfig;
       // 配置变了立刻刷新 widget
       if (uiRef) {
