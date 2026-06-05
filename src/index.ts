@@ -19,6 +19,7 @@ import { createTracker, lastToolName } from "./core/tracker.js";
 import { getProjectId } from "./core/project.js";
 import { loadConfig, saveConfig, type BudgetConfig, DEFAULT_WIDGET_CONFIG } from "./config.js";
 import { createWidgetRenderer, type WidgetState } from "./ui/widget.js";
+import { createDashboard } from "./ui/dashboard.js";
 import { checkSessionLimit } from "./core/limits.js";
 import { showSoftLimitCard, showHardLimitCard, askNewBudget } from "./ui/alert-card.js";
 import {
@@ -29,7 +30,7 @@ import {
   fmtUsd,
 } from "./commands/set.js";
 import { renderOverview, type OverviewInput } from "./commands/overview.js";
-import { parseRange, parseByDim, runReport, runBy, type ReportRange } from "./commands/report.js";
+import { parseRange, parseByDim, runReport, runBy, rangeToSince, type ReportRange } from "./commands/report.js";
 import { openWidgetSettings, openFullSettings } from "./commands/config.js";
 
 export default function (pi: ExtensionAPI) {
@@ -379,12 +380,13 @@ export default function (pi: ExtensionAPI) {
     try {
       const db = await getDb();
       usedUsd = createTracker(db).sessionUsd(sessionId);
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
+
     const budgetUsd = config.session?.usd;
     const status = checkSessionLimit(usedUsd, budgetUsd ?? 0, config);
-    const text = renderOverview({
+
+    // 1. 概览
+    const overview = renderOverview({
       sessionId,
       usedUsd,
       budgetUsd,
@@ -393,24 +395,55 @@ export default function (pi: ExtensionAPI) {
       status,
     });
 
-    // 用 TUI 面板显示概览，不再小窗通知
+    // 2. 今日报表
+    let report = "（暂无数据）";
+    try {
+      const db = await getDb();
+      const since = rangeToSince("today");
+      const { renderReport } = await import("./ui/report.js");
+      const totals = db.getTotals(since);
+      const sessions = db.countSessions(since);
+      report = renderReport({
+        range: "today",
+        since,
+        until: Date.now(),
+        totals: { usd: totals.usd, sessions, requests: totals.requests },
+        byModel: db.aggregateBy("model", since),
+        byTool: db.aggregateBy("tool", since),
+      });
+    } catch { /* ignore */ }
+
+    // 3. Widget 摘要
+    const wc = widgetConfig();
+    const widgetSummary = [
+      `当前模式：${wc.compact ? "极简" : wc.showModel !== false ? "丰富" : "自定义"}`,
+      `位置：${wc.placement === "aboveEditor" ? "编辑器上方" : "输入框下方"}`,
+      `模型名：${wc.showModel !== false ? "显示" : "隐藏"}`,
+      `进度条：${wc.showProgressBar !== false ? "显示" : "隐藏"}`,
+      `上下文：${wc.showContextWindow !== false ? "显示" : "隐藏"}`,
+      `货币：${wc.currencySymbol ?? "$"}`,
+      "",
+      "💡 按 ← → 切换标签浏览全部内容",
+      "💡 /budget widget 可交互编辑外观",
+    ].join("\n");
+
+    // 4. 配置摘要
+    const configSummary = [
+      `软限行为：${config.onSoftLimit === "notify" ? "通知" : config.onSoftLimit === "pause" ? "弹窗" : "降级"}`,
+      `软限阈值：${Math.round(config.softLimitRatio * 100)}%`,
+      `硬限行为：${config.onHardLimit === "pause" ? "弹窗" : "终止"}`,
+      `项目识别：${config.projectIdOverride ? "自定义" : "自动（git remote）"}`,
+      `调试日志：${config.debug ? "开启" : "关闭"}`,
+      "",
+      "💡 /budget config 可交互编辑设置",
+    ].join("\n");
+
     await ctx.ui.custom<void>((_tui, theme, _kb, done) => {
-      const lines = text.split("\n");
-      return {
-        render(_width: number) {
-          // 顶部加标题 & 底部加提示
-          const header = theme.fg("accent", "┌─ pi-budget ─────────────────────────────────────┐");
-          const body = lines.map((l) => `│ ${l}`.padEnd(49) + "│");
-          const hint = theme.fg("dim", "│  按任意键关闭                                    │");
-          const bottom = theme.fg("accent", "└─────────────────────────────────────────────────┘");
-          return [header, ...body, hint, bottom];
-        },
-        invalidate() {},
-        handleInput(_data: string) {
-          done();
-          return true;
-        },
-      };
+      return createDashboard(
+        { overview, report, widgetSummary, configSummary },
+        theme,
+        () => done(),
+      );
     });
   }
 
