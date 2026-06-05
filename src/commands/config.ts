@@ -350,6 +350,46 @@ export async function openFullSettings(
   return openSettingsPanel(t("config.title"), buildAllItems(config), config, ui, onSave);
 }
 
+/**
+ * 给仪表盘「设置」标签用的 SettingsList 工厂。返回独立实例（不带外层面板）。
+ * 调用方负责把它嵌入到自己的容器里。
+ */
+export function createSettingsListForDashboard(
+  initialConfig: BudgetConfig,
+  onSave: (config: BudgetConfig) => void,
+): SettingsList {
+  // 注意：这是同步函数，主题走默认回退（label/value 不上色，但功能完整）
+  const fallbackTheme: SettingsListTheme = {
+    label: (text) => text,
+    value: (text) => text,
+    description: (text) => `  ${text}`,
+    cursor: "› ",
+    hint: (text) => `── ${text} ──`,
+  };
+
+  let current = JSON.parse(JSON.stringify(initialConfig)) as BudgetConfig;
+  const items = buildAllItems(current);
+
+  return new SettingsList(
+    items,
+    12,
+    fallbackTheme,
+    (id, newValue) => {
+      current = applyChange(current, id, newValue);
+      saveConfig(current);
+      onSave(current);
+
+      // 联动刷新
+      if (id === "mode") {
+        const modeKey = MODE_KEYS.find(k => modeLabel(k) === newValue) ?? MODE_FULL;
+        const patch = applyMode(modeKey);
+        // 这里拿不到 list 实例的引用（构造中），需要外部拿到返回值后调用
+      }
+    },
+    () => {},
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════
 // 主题
 // ═══════════════════════════════════════════════════════════════

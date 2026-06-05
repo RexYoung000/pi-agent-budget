@@ -32,7 +32,7 @@ import {
 } from "./commands/set.js";
 import { renderOverview, type OverviewInput } from "./commands/overview.js";
 import { parseRange, parseByDim, runReport, runBy, rangeToSince, type ReportRange } from "./commands/report.js";
-import { openWidgetSettings, openFullSettings } from "./commands/config.js";
+import { openWidgetSettings, openFullSettings, createSettingsListForDashboard } from "./commands/config.js";
 import { parseExportFormat, runExport as runExportCommand } from "./commands/export.js";
 
 export default function (pi: ExtensionAPI) {
@@ -440,6 +440,7 @@ export default function (pi: ExtensionAPI) {
       `${t("config.hardLimitBehavior")}: ${config.onHardLimit === "abort" ? "Terminate" : "Popup"}`,
       `${t("config.projectId")}: ${config.projectIdOverride ? t("config.custom") : t("config.auto")}`,
       `${t("config.debugLog")}: ${config.debug ? t("config.widgetSummary.debug.on") : t("config.widgetSummary.debug.off")}`,
+      `${t("config.locale")}: ${config.locale ?? "en"}`,
       "",
       `💡 /budget config`,
     ].join("\n");
@@ -448,6 +449,12 @@ export default function (pi: ExtensionAPI) {
       return createDashboard(
         { overview, report, widgetSummary, configSummary },
         theme,
+        {
+          settingsFactory: () => createSettingsListForDashboard(config, (c) => {
+            config = c;
+            if (config.locale) setLocale(config.locale);
+          }),
+        },
         () => done(),
       );
     });
