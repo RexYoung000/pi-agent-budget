@@ -392,7 +392,26 @@ export default function (pi: ExtensionAPI) {
       lastRequest: lastRequestSnap,
       status,
     });
-    ctx.ui.notify(text, "info");
+
+    // 用 TUI 面板显示概览，不再小窗通知
+    await ctx.ui.custom<void>((_tui, theme, _kb, done) => {
+      const lines = text.split("\n");
+      return {
+        render(_width: number) {
+          // 顶部加标题 & 底部加提示
+          const header = theme.fg("accent", "┌─ pi-budget ─────────────────────────────────────┐");
+          const body = lines.map((l) => `│ ${l}`.padEnd(49) + "│");
+          const hint = theme.fg("dim", "│  按任意键关闭                                    │");
+          const bottom = theme.fg("accent", "└─────────────────────────────────────────────────┘");
+          return [header, ...body, hint, bottom];
+        },
+        invalidate() {},
+        handleInput(_data: string) {
+          done();
+          return true;
+        },
+      };
+    });
   }
 
   async function runSetCommand(args: string, ctx: ExtensionCommandContext): Promise<void> {
