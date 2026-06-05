@@ -138,12 +138,13 @@ pi-budget/
 
 ```
 /budget                       # 当前会话实时概览
+/budget widget                # Widget 外观设置（推荐入口，TUI 面板）
+/budget config                # 完整设置（含限值等）
 /budget set <amount>          # 设置本会话预算        例：/budget set 2.00
 /budget set project <amount>  # 设置项目日预算        例：/budget set project 10
 /budget unset [scope]         # 清除预算（session/project/global）
 /budget report [range]        # 完整报表              例：/budget report today / week / month
 /budget by <dim> [range]      # 维度切片              例：/budget by tool / by model / by session
-/budget config                # 打开 TUI 配置界面
 ```
 
 ## 配置说明

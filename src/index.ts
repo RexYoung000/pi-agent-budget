@@ -30,7 +30,7 @@ import {
 } from "./commands/set.js";
 import { renderOverview, type OverviewInput } from "./commands/overview.js";
 import { parseRange, parseByDim, runReport, runBy, type ReportRange } from "./commands/report.js";
-import { openConfigTUI } from "./commands/config.js";
+import { openWidgetSettings, openFullSettings } from "./commands/config.js";
 
 export default function (pi: ExtensionAPI) {
   // ────────────────────────────────────────────────────────────────────────
@@ -363,8 +363,12 @@ export default function (pi: ExtensionAPI) {
         await runConfigCommand(ctx);
         return;
       }
+      if (sub === "widget") {
+        await runWidgetCommand(ctx);
+        return;
+      }
 
-      const help = `未知子命令: ${sub}\n支持的子命令：set / unset / report / by / config`;
+      const help = `未知子命令: ${sub}\n支持的子命令：widget / set / unset / report / by / config`;
       ctx.ui.notify(help, "warning");
     },
   });
@@ -477,21 +481,29 @@ export default function (pi: ExtensionAPI) {
 
   async function runConfigCommand(ctx: ExtensionCommandContext): Promise<void> {
     try {
-      const newConfig = await openConfigTUI(config, ctx.ui);
-      config = newConfig;
-      // 配置变了立刻刷新 widget
-      if (uiRef) {
-        const sessionId = getSessionId(ctx);
-        let usedUsd = 0;
-        try {
-          const db = await getDb();
-          usedUsd = createTracker(db).sessionUsd(sessionId);
-        } catch { /* ignore */ }
-        refreshWidget(uiRef, ctx, usedUsd);
-      }
+      config = await openFullSettings(config, ctx.ui, (c) => { config = c; });
+      refreshWidgetAfterConfig(ctx);
     } catch (err) {
-      ctx.ui.notify(`配置界面错误: ${(err as Error).message}`, "error");
+      ctx.ui.notify(`设置错误: ${(err as Error).message}`, "error");
     }
+  }
+
+  async function runWidgetCommand(ctx: ExtensionCommandContext): Promise<void> {
+    try {
+      config = await openWidgetSettings(config, ctx.ui, (c) => { config = c; });
+      refreshWidgetAfterConfig(ctx);
+    } catch (err) {
+      ctx.ui.notify(`设置错误: ${(err as Error).message}`, "error");
+    }
+  }
+
+  function refreshWidgetAfterConfig(ctx: ExtensionCommandContext): void {
+    if (!uiRef) return;
+    const sessionId = getSessionId(ctx);
+    let usedUsd = 0;
+    try {
+      getDb().then((db) => { usedUsd = createTracker(db).sessionUsd(sessionId); refreshWidget(uiRef!, ctx, usedUsd); });
+    } catch { /* ignore */ }
   }
 
   // 防 TS unused
