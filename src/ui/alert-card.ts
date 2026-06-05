@@ -3,50 +3,68 @@
  *
  * 设计文档：../../design.md §5.2
  *
- * 状态：🚧 scaffold-only
- *
- * 软限弹窗（80%）：
- *   ┌─ 预算警告 ──────────────────────────┐
- *   │ 已用 $0.80 / $1.00 (80%)            │
- *   │ 预计还能跑 ~4 次类似请求             │
- *   │                                      │
- *   │ [继续]  [切到 Haiku]  [结束]  [调高] │
- *   └──────────────────────────────────────┘
- *
- * 硬限弹窗（100%）：
- *   ┌─ 硬限触发 ──────────────────────────┐
- *   │ 已达 $1.00 上限，已暂停新请求        │
- *   │                                      │
- *   │ [本次放行 + 调高预算]  [结束会话]    │
- *   │ [导出报告]                           │
- *   └──────────────────────────────────────┘
+ * MVP 简化版：用 ctx.ui.select(title, options) 做选项式弹窗。
+ * v2 可换 ctx.ui.custom() 渲染更复杂的卡片（进度条/历史曲线）。
  */
+
+import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 
 import type { LimitStatus } from "../core/limits.js";
 
-export type SoftLimitAction = "continue" | "downgrade" | "abort" | "raise";
-export type HardLimitAction = "raise_and_continue" | "abort" | "export";
+export type SoftLimitAction = "continue" | "abort" | "raise";
+export type HardLimitAction = "raise_and_continue" | "abort";
 
-/**
- * 弹出软限卡片，等待用户选择。
- *
- * 实现：用 ctx.ui.select(title, options) 选项式弹窗（MVP 简化版）。
- * v2 可换成 ctx.ui.custom() 渲染更复杂的卡片。
- */
-export async function showSoftLimitCard(_status: LimitStatus): Promise<SoftLimitAction> {
-  // TODO(MVP):
-  //   const title = `预算警告：已用 $${used}/${budget} (${pct}%)`;
-  //   const choice = await ctx.ui.select(title, ["继续", "切到 Haiku", "结束", "调高"]);
-  //   return mapToAction(choice);
-  throw new Error("showSoftLimitCard() not implemented (scaffold-only)");
+const SOFT_OPTIONS: Array<{ label: string; value: SoftLimitAction }> = [
+  { label: "继续（不提醒到硬限）", value: "continue" },
+  { label: "调高预算", value: "raise" },
+  { label: "结束会话", value: "abort" },
+];
+
+const HARD_OPTIONS: Array<{ label: string; value: HardLimitAction }> = [
+  { label: "本次放行 + 调高预算", value: "raise_and_continue" },
+  { label: "结束会话", value: "abort" },
+];
+
+function formatTitle(prefix: string, status: LimitStatus): string {
+  const pct = Math.round(status.ratio * 100);
+  return `${prefix}：已用 $${status.current.toFixed(2)} / $${status.budget.toFixed(2)} (${pct}%)`;
+}
+
+/** 弹出软限选项，等待用户选择。无 ui / 用户取消 → 默认 "continue"。 */
+export async function showSoftLimitCard(
+  ui: Pick<ExtensionUIContext, "select">,
+  status: LimitStatus,
+): Promise<SoftLimitAction> {
+  const title = formatTitle("预算警告", status);
+  const labels = SOFT_OPTIONS.map((o) => o.label);
+  const choice = await ui.select(title, labels);
+  if (choice == null) return "continue"; // 用户取消默认放行
+  return SOFT_OPTIONS.find((o) => o.label === choice)?.value ?? "continue";
+}
+
+/** 弹出硬限选项，等待用户选择。无 ui / 用户取消 → 默认 "abort"（更安全）。 */
+export async function showHardLimitCard(
+  ui: Pick<ExtensionUIContext, "select">,
+  status: LimitStatus,
+): Promise<HardLimitAction> {
+  const title = formatTitle("硬限触发", status);
+  const labels = HARD_OPTIONS.map((o) => o.label);
+  const choice = await ui.select(title, labels);
+  if (choice == null) return "abort"; // 用户取消默认拒绝
+  return HARD_OPTIONS.find((o) => o.label === choice)?.value ?? "abort";
 }
 
 /**
- * 弹出硬限卡片。返回前会阻塞新的 user message 提交。
+ * 让用户输入新的预算金额。返回数字（USD），用户取消或解析失败 → undefined。
  */
-export async function showHardLimitCard(_status: LimitStatus): Promise<HardLimitAction> {
-  // TODO(MVP):
-  //   const title = `硬限触发：已达 $${budget} 上限，已暂停新请求`;
-  //   const choice = await ctx.ui.select(title, ["本次放行 + 调高预算", "结束会话", "导出报告"]);
-  throw new Error("showHardLimitCard() not implemented (scaffold-only)");
+export async function askNewBudget(
+  ui: Pick<ExtensionUIContext, "input">,
+  current?: number,
+): Promise<number | undefined> {
+  const placeholder = current ? `当前 $${current.toFixed(2)}，输入新金额` : "输入新预算金额（USD）";
+  const raw = await ui.input("调高预算", placeholder);
+  if (raw == null) return undefined;
+  const n = Number(raw.trim());
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return n;
 }
