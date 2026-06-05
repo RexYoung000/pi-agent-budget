@@ -38,7 +38,7 @@ export function parseRange(arg: string | undefined): ReportRange {
     case "all":
       return "all";
     default:
-      throw new Error(`未知范围: ${arg}。支持 today/week/month/all`);
+      throw new Error(`Unknown range: ${arg}. Supported: today/week/month/all`);
   }
 }
 

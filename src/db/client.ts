@@ -183,6 +183,40 @@ export class BudgetDb {
     return row?.n ?? 0;
   }
 
+  /** 获取所有 CostRecord（用于导出）。支持按时间范围过滤。 */
+  getAllCosts(since: number = 0): CostRecord[] {
+    const rows = this.db.prepare<[number], {
+      id: string; session_id: string; project_id: string; timestamp: number;
+      model: string; input_tokens: number; output_tokens: number;
+      cache_read: number; cache_write: number;
+      cost_input: number; cost_output: number; cost_cache_read: number; cost_cache_write: number; cost_total: number;
+      tool_name: string | null; task_id: string | null;
+    }>(
+      "SELECT * FROM costs WHERE timestamp >= ? ORDER BY timestamp ASC"
+    ).all(since);
+
+    return rows.map((r) => ({
+      id: r.id,
+      sessionId: r.session_id,
+      projectId: r.project_id,
+      timestamp: r.timestamp,
+      model: r.model,
+      inputTokens: r.input_tokens,
+      outputTokens: r.output_tokens,
+      cacheRead: r.cache_read,
+      cacheWrite: r.cache_write,
+      cost: {
+        input: r.cost_input,
+        output: r.cost_output,
+        cacheRead: r.cost_cache_read,
+        cacheWrite: r.cost_cache_write,
+        total: r.cost_total,
+      },
+      toolName: r.tool_name ?? undefined,
+      taskId: r.task_id ?? undefined,
+    }));
+  }
+
   // ── Budgets ──────────────────────────────────────────────────────────
 
   setBudget(row: Omit<BudgetRow, "updatedAt">): void {

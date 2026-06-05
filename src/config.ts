@@ -30,6 +30,9 @@ export interface BudgetConfig {
   /** 调试日志开关。开启后写入 ~/.pi/logs/budget.log。 */
   debug?: boolean;
 
+  /** 语言。默认 "en"。支持 en、zh-CN、ja、ko。 */
+  locale?: string;
+
   /** widget 外观 & 行为。 */
   widget?: WidgetConfig;
 }
@@ -64,6 +67,7 @@ export const DEFAULT_CONFIG: BudgetConfig = {
   onHardLimit: "pause",
   softLimitRatio: 0.8,
   hardLimitRatio: 1.0,
+  locale: "en",
 };
 
 /** 读配置；文件不存在 / 解析失败 → 返回 DEFAULT_CONFIG（不抛错，不让扩展崩）。 */

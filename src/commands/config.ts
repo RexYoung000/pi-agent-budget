@@ -6,10 +6,11 @@
  *   /budget config   → 完整设置（含限值、调试等高级项）
  *
  * 特点：
- *   - 显示模式三档：极简 / 丰富 / 自定义
- *   - 每项有通俗中文说明 + 实时预览
+ *   - 显示模式三档：compact / full / custom
+ *   - 每项有通俗说明 + 实时预览
  *   - 方向键导航、Enter 切换、ESC 退出提交
  *   - 切换立刻写入 ~/.pi/budget.json
+ *   - 支持多语言（en / zh-CN / ja / ko）
  */
 
 import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent";
@@ -17,47 +18,89 @@ import { SettingsList, type SettingItem, type SettingsListTheme } from "@earendi
 
 import type { BudgetConfig, WidgetConfig } from "../config.js";
 import { DEFAULT_WIDGET_CONFIG, saveConfig, DEFAULT_CONFIG } from "../config.js";
+import { t, getSupportedLocales } from "../i18n/index.js";
+import { LOCALE_LABELS, type Locale } from "../i18n/locales.js";
 
 // ═══════════════════════════════════════════════════════════════
-// 值映射
+// 值映射（内部 key → 各语言显示标签在 locales.ts 中定义）
 // ═══════════════════════════════════════════════════════════════
 
-const PLACEMENT_LABELS: Record<string, string> = {
-  belowEditor: "输入框下方   ",
-  aboveEditor: "编辑器上方",
-};
-const PLACEMENT_VALUES = ["输入框下方   ", "编辑器上方"];
-const PLACEMENT_REV: Record<string, string> = { "输入框下方   ": "belowEditor", "编辑器上方": "aboveEditor" };
+/** 用于 applyChange 的内部 key，不依赖显示文本 */
+type InternalKey = string;
+type SettingId =
+  | "mode" | "placement" | "currencySymbol"
+  | "showModel" | "showProgressBar" | "showContextWindow"
+  | "softLimit" | "softLimitRatio" | "hardLimit"
+  | "debug" | "locale";
 
-const MODE_VALUES = ["极简", "丰富", "自定义"];
+// 内部 key → 布尔值映射
+const ON_KEY = "on";
+const OFF_KEY = "off";
 
-const ONOFF_REV = (v: boolean) => (v ? "显示" : "隐藏");
-const CURRENCY_VALUES = ["$", "US$", "¥", "€", "£"];
+function boolDisplay(v: boolean): InternalKey { return v ? ON_KEY : OFF_KEY; }
+
+// 模式
+const MODE_COMPACT = "compact";
+const MODE_FULL = "full";
+const MODE_CUSTOM = "custom";
+const MODE_KEYS = [MODE_COMPACT, MODE_FULL, MODE_CUSTOM] as const;
+
+function modeLabel(key: string): string {
+  switch (key) {
+    case MODE_COMPACT: return t("widget.config.compact");
+    case MODE_FULL: return "Full";
+    case MODE_CUSTOM: return "Custom";
+    default: return key;
+  }
+}
+
+// 摆放位置
+const PLACEMENT_BELOW = "belowEditor";
+const PLACEMENT_ABOVE = "aboveEditor";
+
+function placementLabel(key: string): string {
+  return key === PLACEMENT_ABOVE ? t("widget.placement.aboveEditor") : t("widget.placement.belowEditor");
+}
+
+// 软限行为
+const SOFT_NOTIFY = "notify";
+const SOFT_PAUSE = "pause";
+
+function softLimitLabel(key: string): string {
+  return key === SOFT_PAUSE ? t("config.widgetSummary.onSoftLimit.pause") : t("config.widgetSummary.onSoftLimit.notify");
+}
+
+// 硬限行为
+const HARD_PAUSE = "pause";
+const HARD_ABORT = "abort";
+
+function hardLimitLabel(key: string): string {
+  return key === HARD_ABORT ? t("config.widgetSummary.onHardLimit.terminate") : t("config.widgetSummary.onHardLimit.pause");
+}
 
 // ═══════════════════════════════════════════════════════════════
 // 模式 → 预设
 // ═══════════════════════════════════════════════════════════════
 
-function applyMode(mode: string): Partial<WidgetConfig> {
-  switch (mode) {
-    case "极简":
+function applyMode(modeKey: string): Partial<WidgetConfig> {
+  switch (modeKey) {
+    case MODE_COMPACT:
       return { compact: true, showModel: false, showProgressBar: false, showContextWindow: false };
-    case "丰富":
+    case MODE_FULL:
       return { compact: false, showModel: true, showProgressBar: true, showContextWindow: true };
-    default: // 自定义
+    default:
       return {};
   }
 }
 
-/** 根据当前 config 反推当前模式（用于初始渲染）。 */
-function currentMode(wc: WidgetConfig): string {
+function currentModeKey(wc: WidgetConfig): string {
   const c = wc.compact ?? false;
   const sm = wc.showModel !== false;
   const sb = wc.showProgressBar !== false;
   const sc = wc.showContextWindow !== false;
-  if (!c && sm && sb && sc) return "丰富";
-  if (c && !sm && !sb && !sc) return "极简";
-  return "自定义";
+  if (!c && sm && sb && sc) return MODE_FULL;
+  if (c && !sm && !sb && !sc) return MODE_COMPACT;
+  return MODE_CUSTOM;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -86,58 +129,58 @@ function previewWidget(wc: WidgetConfig, sym: string): string {
 
 function buildWidgetItems(config: BudgetConfig): SettingItem[] {
   const wc: WidgetConfig = { ...DEFAULT_WIDGET_CONFIG, ...(config.widget ?? {}) };
-  const mode = currentMode(wc);
+  const currentMode = currentModeKey(wc);
   const sym = wc.currencySymbol ?? "$";
 
   return [
     {
       id: "mode",
-      label: "显示模式",
+      label: t("widget.config.compact"), // reused: compact/full selection
       description: [
-        `当前预览：`,
+        `Live Preview:`,
         `  ${previewWidget(wc, sym).split("\n").join("\n  ")}`,
         "",
-        "「极简」只显示一行成本数字。",
-        "「丰富」显示模型名 + 进度条 + 上下文窗口。",
-        "「自定义」自由开关下面每一项。",
+        `• ${modeLabel(MODE_COMPACT)}: cost only, one line.`,
+        `• ${modeLabel(MODE_FULL)}: model + progress bar + context window.`,
+        `• ${modeLabel(MODE_CUSTOM)}: toggle each item below.`,
       ].join("\n"),
-      currentValue: mode,
-      values: MODE_VALUES,
+      currentValue: modeLabel(currentMode),
+      values: MODE_KEYS.map(modeLabel),
     },
     {
       id: "placement",
-      label: "Widget 显示在哪",
-      description: "选择 Widget 出现在编辑器上方还是输入框下面。推荐放在输入框下面，不遮挡代码。",
-      currentValue: (PLACEMENT_LABELS[wc.placement ?? "belowEditor"] ?? "输入框下方   ") as string,
-      values: PLACEMENT_VALUES,
+      label: t("widget.config.placement"),
+      description: t("widget.placement.belowEditor") + " / " + t("widget.placement.aboveEditor"),
+      currentValue: placementLabel(wc.placement ?? PLACEMENT_BELOW),
+      values: [PLACEMENT_BELOW, PLACEMENT_ABOVE].map(placementLabel),
     },
     {
       id: "currencySymbol",
-      label: "货币符号",
-      description: `成本数字前面的符号。只是显示样式，不做汇率换算（pi 内部统一用 USD 计价）。\n预览：${sym}0.42`,
+      label: t("widget.config.currency"),
+      description: `Prefix before cost numbers. Cosmetic only (pi uses USD internally).\nPreview: ${sym}0.42`,
       currentValue: sym,
-      values: CURRENCY_VALUES,
+      values: ["$", "US$", "¥", "€", "£"],
     },
     {
       id: "showModel",
-      label: "显示当前模型名",
-      description: `打开后 Widget 第一行会显示当前使用的 AI 模型（如 claude-sonnet-4.5）。\n预览：${wc.showModel !== false ? "sonnet │ $0.42/$1.00" : "$0.42/$1.00"}`,
-      currentValue: ONOFF_REV(wc.showModel !== false),
-      values: ["显示", "隐藏"],
+      label: t("widget.config.showModel"),
+      description: `Show current AI model name on widget.\nPreview: ${wc.showModel !== false ? "sonnet │ $0.42/$1.00" : "$0.42/$1.00"}`,
+      currentValue: boolDisplay(wc.showModel !== false),
+      values: [ON_KEY, OFF_KEY],
     },
     {
       id: "showProgressBar",
-      label: "显示预算进度条",
-      description: `打开后 Widget 用 █ 和 ░ 直观展示预算消耗进度。颜色随消耗自动变化：绿→青→橙→红。\n预览：${wc.showProgressBar !== false ? "$0.42/$1.00 ████░░░░░░" : "$0.42/$1.00"}`,
-      currentValue: ONOFF_REV(wc.showProgressBar !== false),
-      values: ["显示", "隐藏"],
+      label: t("widget.config.showProgress"),
+      description: `Show budget bar with █ and ░. Color changes: green → cyan → orange → red.\nPreview: ${wc.showProgressBar !== false ? "$0.42/$1.00 ████░░░░░░" : "$0.42/$1.00"}`,
+      currentValue: boolDisplay(wc.showProgressBar !== false),
+      values: [ON_KEY, OFF_KEY],
     },
     {
       id: "showContextWindow",
-      label: "显示上下文窗口用量",
-      description: `打开后 Widget 第二行显示当前会话的上下文使用情况。数据自动从当前模型读取，不写死。\n预览：📊 28K/200K (14%)`,
-      currentValue: ONOFF_REV(wc.showContextWindow !== false),
-      values: ["显示", "隐藏"],
+      label: t("widget.config.showContext"),
+      description: `Show context window usage (tokens / limit + %).\nPreview: 📊 28K/200K (14%)`,
+      currentValue: boolDisplay(wc.showContextWindow !== false),
+      values: [ON_KEY, OFF_KEY],
     },
   ];
 }
@@ -146,42 +189,47 @@ function buildAllItems(config: BudgetConfig): SettingItem[] {
   const widgetItems = buildWidgetItems(config);
 
   return [
-    // 第一节：Widget
     ...widgetItems,
-    // 第二节：限值行为
     {
       id: "softLimit",
-      label: "━━ 预算警告（软限）",
-      description: `达到预算的 ${Math.round(config.softLimitRatio * 100)}% 时触发。\n「通知」只在状态栏提示。「弹窗」跳出选项让你选择继续/调高/结束。`,
-      currentValue: config.onSoftLimit === "notify" ? "仅通知" : "弹窗询问",
-      values: ["仅通知", "弹窗询问"],
+      label: t("config.softLimitBehavior"),
+      description: `Triggered at ${Math.round(config.softLimitRatio * 100)}% of budget.\n${softLimitLabel(SOFT_NOTIFY)}: notification only.\n${softLimitLabel(SOFT_PAUSE)}: popup with options.`,
+      currentValue: softLimitLabel(config.onSoftLimit),
+      values: [SOFT_NOTIFY, SOFT_PAUSE].map(softLimitLabel),
     },
     {
       id: "softLimitRatio",
-      label: "  警告触发阈值",
-      description: "预算消耗到多少百分比时警告你。",
+      label: t("config.softLimitThreshold"),
+      description: "Budget % at which to warn you.",
       currentValue: `${Math.round(config.softLimitRatio * 100)}%`,
       values: ["70%", "80%", "90%"],
     },
     {
       id: "hardLimit",
-      label: "━━ 强制限额（硬限）",
-      description: `达到预算 100% 时触发。\n「弹窗」跳出选项让你选择放行/结束。「终止」直接拒绝发送新消息到 AI。`,
-      currentValue: config.onHardLimit === "pause" ? "弹窗询问" : "直接终止",
-      values: ["弹窗询问", "直接终止"],
+      label: t("config.hardLimitBehavior"),
+      description: `Triggered at 100% of budget.\n${hardLimitLabel(HARD_PAUSE)}: popup with options.\n${hardLimitLabel(HARD_ABORT)}: reject new messages immediately.`,
+      currentValue: hardLimitLabel(config.onHardLimit),
+      values: [HARD_PAUSE, HARD_ABORT].map(hardLimitLabel),
     },
     {
       id: "debug",
-      label: "调试日志",
-      description: "开启后会在 ~/.pi/logs/ 下记录详细运行日志。正常使用无需开启。",
-      currentValue: config.debug ? "开启" : "关闭",
-      values: ["关闭", "开启"],
+      label: t("config.debugLog"),
+      description: "Write detailed logs to ~/.pi/logs/. Not needed for normal use.",
+      currentValue: boolDisplay(!!config.debug),
+      values: [ON_KEY, OFF_KEY],
+    },
+    {
+      id: "locale",
+      label: t("config.locale"),
+      description: "Change the display language. This setting is saved to config.",
+      currentValue: (config.locale ?? "en") as string,
+      values: getSupportedLocales().map((l) => l as string),
     },
   ];
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 变更应用
+// 变更应用（基于内部 key，不依赖显示文本）
 // ═══════════════════════════════════════════════════════════════
 
 function applyChange(config: BudgetConfig, id: string, displayValue: string): BudgetConfig {
@@ -190,36 +238,41 @@ function applyChange(config: BudgetConfig, id: string, displayValue: string): Bu
 
   switch (id) {
     case "mode": {
-      const patch = applyMode(displayValue);
+      // 反向查找：displayValue → mode key
+      const modeKey = MODE_KEYS.find(k => modeLabel(k) === displayValue) ?? MODE_FULL;
+      const patch = applyMode(modeKey);
       Object.assign(wc, patch);
       break;
     }
     case "placement":
-      wc.placement = PLACEMENT_REV[displayValue] as "belowEditor" | "aboveEditor";
+      wc.placement = (displayValue === placementLabel(PLACEMENT_ABOVE) ? PLACEMENT_ABOVE : PLACEMENT_BELOW) as "belowEditor" | "aboveEditor";
       break;
     case "currencySymbol":
       wc.currencySymbol = displayValue;
       break;
     case "showModel":
-      wc.showModel = displayValue === "显示";
+      wc.showModel = displayValue === ON_KEY;
       break;
     case "showProgressBar":
-      wc.showProgressBar = displayValue === "显示";
+      wc.showProgressBar = displayValue === ON_KEY;
       break;
     case "showContextWindow":
-      wc.showContextWindow = displayValue === "显示";
+      wc.showContextWindow = displayValue === ON_KEY;
       break;
     case "softLimit":
-      next.onSoftLimit = displayValue === "弹窗询问" ? "pause" : "notify";
+      next.onSoftLimit = displayValue === softLimitLabel(SOFT_PAUSE) ? "pause" : "notify";
       break;
     case "softLimitRatio":
       next.softLimitRatio = Number(displayValue.replace("%", "")) / 100;
       break;
     case "hardLimit":
-      next.onHardLimit = displayValue === "直接终止" ? "abort" : "pause";
+      next.onHardLimit = displayValue === hardLimitLabel(HARD_ABORT) ? "abort" : "pause";
       break;
     case "debug":
-      next.debug = displayValue === "开启";
+      next.debug = displayValue === ON_KEY;
+      break;
+    case "locale":
+      next.locale = displayValue;
       break;
   }
 
@@ -252,23 +305,20 @@ async function openSettingsPanel(
         saveConfig(current);
         onSave(current);
 
-        // 模式变了 → 同步关联项
+        // mode 变更 → 同步关联布尔项
         if (id === "mode") {
-          const patch = applyMode(newValue);
-          const nextWc = { ...DEFAULT_WIDGET_CONFIG, ...(current.widget ?? {}) };
-          list.updateValue("showModel", patch.showModel !== false ? "显示" : "隐藏");
-          list.updateValue("showProgressBar", patch.showProgressBar !== false ? "显示" : "隐藏");
-          list.updateValue("showContextWindow", patch.showContextWindow !== false ? "显示" : "隐藏");
-          if (patch.compact !== undefined) {
-            // compact 不直接显示为一条，但影响预览
-          }
+          const modeKey = MODE_KEYS.find(k => modeLabel(k) === newValue) ?? MODE_FULL;
+          const patch = applyMode(modeKey);
+          list.updateValue("showModel", patch.showModel !== false ? ON_KEY : OFF_KEY);
+          list.updateValue("showProgressBar", patch.showProgressBar !== false ? ON_KEY : OFF_KEY);
+          list.updateValue("showContextWindow", patch.showContextWindow !== false ? ON_KEY : OFF_KEY);
         }
 
-        // 单项变了 → 反推新模式并刷新
+        // 单项变更 → 反推 mode
         if (["showModel", "showProgressBar", "showContextWindow"].includes(id)) {
           const refreshedWc = { ...DEFAULT_WIDGET_CONFIG, ...(current.widget ?? {}) };
-          const newMode = currentMode(refreshedWc);
-          list.updateValue("mode", newMode);
+          const newMode = currentModeKey(refreshedWc);
+          list.updateValue("mode", modeLabel(newMode));
         }
 
         list.updateValue(id, newValue);
@@ -284,22 +334,20 @@ async function openSettingsPanel(
 // 两个对外入口
 // ═══════════════════════════════════════════════════════════════
 
-/** /budget widget —— Widget 外观设置（推荐主入口） */
 export async function openWidgetSettings(
   config: BudgetConfig,
   ui: ExtensionUIContext,
   onSave: (config: BudgetConfig) => void,
 ): Promise<BudgetConfig> {
-  return openSettingsPanel("Widget 外观", buildWidgetItems(config), config, ui, onSave);
+  return openSettingsPanel(t("widget.config.title"), buildWidgetItems(config), config, ui, onSave);
 }
 
-/** /budget config —— 完整设置（含限值等） */
 export async function openFullSettings(
   config: BudgetConfig,
   ui: ExtensionUIContext,
   onSave: (config: BudgetConfig) => void,
 ): Promise<BudgetConfig> {
-  return openSettingsPanel("pi-budget 设置", buildAllItems(config), config, ui, onSave);
+  return openSettingsPanel(t("config.title"), buildAllItems(config), config, ui, onSave);
 }
 
 // ═══════════════════════════════════════════════════════════════

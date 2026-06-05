@@ -8,6 +8,7 @@
  */
 
 import type { LimitStatus } from "../core/limits.js";
+import { t } from "../i18n/index.js";
 import { renderProgressBar } from "../ui/widget.js";
 
 export interface OverviewInput {
@@ -48,30 +49,30 @@ export function renderOverview(input: OverviewInput): string {
     const pct = Math.round(ratio * 100);
     const bar = renderProgressBar(ratio, 12);
     lines.push(
-      `Session:  $${input.usedUsd.toFixed(2)} / $${input.budgetUsd.toFixed(2)}  (${pct}%) ${bar}`,
+      `${t("overview.session")}:  $${input.usedUsd.toFixed(2)} / $${input.budgetUsd.toFixed(2)}  (${pct}%) ${bar}`,
     );
-    if (input.model) lines.push(`Model:    ${input.model}`);
+    if (input.model) lines.push(`${t("overview.model")}:    ${input.model}`);
     if (input.lastRequest) {
       lines.push(
-        `Last:     $${input.lastRequest.costUsd.toFixed(4)} (in ${fmtTokens(
+        `${t("overview.last")}:     $${input.lastRequest.costUsd.toFixed(4)} (in ${fmtTokens(
           input.lastRequest.inputTokens,
         )} / out ${fmtTokens(input.lastRequest.outputTokens)})`,
       );
     }
     const icon = iconForLevel(input.status?.level, ratio);
-    lines.push(`Status:   ${icon} ${input.status?.level ?? "ok"}`);
+    lines.push(`${t("overview.status")}:   ${icon} ${input.status?.level ?? "ok"}`);
 
     if (input.lastRequest && input.lastRequest.costUsd > 0) {
       const remaining = Math.max(0, input.budgetUsd - input.usedUsd);
       const est = Math.floor(remaining / input.lastRequest.costUsd);
       lines.push("");
-      lines.push(`预计还可发起 ~${est} 次类似请求`);
+      lines.push(t("overview.estRemaining", { count: est }));
     }
   } else {
-    lines.push(`Session:  $${input.usedUsd.toFixed(2)} (no budget)`);
-    if (input.model) lines.push(`Model:    ${input.model}`);
+    lines.push(`${t("overview.session")}:  $${input.usedUsd.toFixed(2)} (${t("overview.noBudget")})`);
+    if (input.model) lines.push(`${t("overview.model")}:    ${input.model}`);
     lines.push("");
-    lines.push("提示：用 `/budget set <usd>` 设置本会话预算");
+    lines.push(t("overview.hintSetBudget"));
   }
 
   return lines.join("\n");

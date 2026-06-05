@@ -18,6 +18,7 @@ import { BudgetDb } from "./db/client.js";
 import { createTracker, lastToolName } from "./core/tracker.js";
 import { getProjectId } from "./core/project.js";
 import { loadConfig, saveConfig, type BudgetConfig, DEFAULT_WIDGET_CONFIG } from "./config.js";
+import { initLocale, t, setLocale } from "./i18n/index.js";
 import { createWidgetRenderer, type WidgetState } from "./ui/widget.js";
 import { createDashboard } from "./ui/dashboard.js";
 import { checkSessionLimit } from "./core/limits.js";
@@ -32,6 +33,7 @@ import {
 import { renderOverview, type OverviewInput } from "./commands/overview.js";
 import { parseRange, parseByDim, runReport, runBy, rangeToSince, type ReportRange } from "./commands/report.js";
 import { openWidgetSettings, openFullSettings } from "./commands/config.js";
+import { parseExportFormat, runExport as runExportCommand } from "./commands/export.js";
 
 export default function (pi: ExtensionAPI) {
   // ────────────────────────────────────────────────────────────────────────
@@ -40,6 +42,9 @@ export default function (pi: ExtensionAPI) {
   let dbPromise: Promise<BudgetDb> | null = null;
   const projectIdCache = new Map<string, string>();
   let config: BudgetConfig = loadConfig();
+
+  // i18n 初始化
+  initLocale(config.locale);
 
   let currentModelDisplay = "";
 
@@ -131,16 +136,15 @@ export default function (pi: ExtensionAPI) {
         if (newAmount && newAmount > 0) {
           config = applySet({ scope: "session", amount: newAmount }, config);
           softLimitAlreadyShown.delete(key);
-          ui.notify(`预算已调高到 ${fmtUsd(newAmount)}`, "info");
+          ui.notify(t("set.raisedTo", { amount: fmtUsd(newAmount) }), "info");
         }
       } else if (action === "abort") {
-        ui.notify("会话已结束（用户主动终止）", "warning");
-        // 不直接 shutdown，仅提示；让用户自行决定
+        ui.notify(t("set.sessionEnded"), "warning");
       } else {
-        ui.notify("已继续，到硬限会再次拦截", "info");
+        ui.notify(t("set.continued"), "info");
       }
     } catch (err) {
-      console.warn(`[pi-budget] 软限弹窗失败: ${(err as Error).message}`);
+      console.warn(`[pi-budget] ${t("log.softLimitError")}: ${(err as Error).message}`);
     }
   }
 
@@ -173,7 +177,7 @@ export default function (pi: ExtensionAPI) {
 
     if (costTotal == null) {
       console.warn(
-        `[pi-budget] usage.cost.total 缺失，跳过记录（model=${message.model ?? "?"}）`,
+        `[pi-budget] ${t("log.costMissing", { model: message.model ?? "?" })}`,
       );
       return;
     }
@@ -218,7 +222,7 @@ export default function (pi: ExtensionAPI) {
         maybeShowSoftLimit(uiForCard, sessionId, usedUsd).catch(() => {});
       }
     } catch (err) {
-      console.warn(`[pi-budget] message_end 处理失败: ${(err as Error).message}`);
+      console.warn(`[pi-budget] ${t("log.messageEndError")}: ${(err as Error).message}`);
     }
   });
 
@@ -240,7 +244,7 @@ export default function (pi: ExtensionAPI) {
       }
       refreshWidget(uiRef, ctx, usedUsd);
     } catch (err) {
-      console.warn(`[pi-budget] session_start 处理失败: ${(err as Error).message}`);
+      console.warn(`[pi-budget] ${t("log.sessionStartError")}: ${(err as Error).message}`);
     }
   });
 
@@ -261,7 +265,7 @@ export default function (pi: ExtensionAPI) {
       currentModelDisplay = event.model?.name ?? event.model?.id ?? currentModelDisplay;
       refreshWidget(uiRef, ctx, usedUsd);
     } catch (err) {
-      console.warn(`[pi-budget] model_select 处理失败: ${(err as Error).message}`);
+      console.warn(`[pi-budget] ${t("log.modelSelectError")}: ${(err as Error).message}`);
     }
   });
 
@@ -313,16 +317,16 @@ export default function (pi: ExtensionAPI) {
         const newAmount = await askNewBudget(ctx.ui, budget);
         if (newAmount && newAmount > 0) {
           config = applySet({ scope: "session", amount: newAmount }, config);
-          ctx.ui.notify(`预算已调高到 ${fmtUsd(newAmount)}，本次放行`, "info");
+          ctx.ui.notify(t("set.raisedTo", { amount: fmtUsd(newAmount) }) + ", " + t("set.continued"), "info");
           return { action: "continue" as const };
         }
         // 用户取消调高 → 视为拒绝
       }
       // abort 或 raise 取消：拦截消息
-      ctx.ui.notify("已硬限，消息未发送（可用 /budget set 调高预算）", "warning");
+      ctx.ui.notify(t("set.hardLimitBlocked"), "warning");
       return { action: "handled" as const };
     } catch (err) {
-      console.warn(`[pi-budget] 硬限弹窗失败: ${(err as Error).message}`);
+      console.warn(`[pi-budget] ${t("log.hardLimitError")}: ${(err as Error).message}`);
       return { action: "continue" as const };
     }
   });
@@ -331,7 +335,7 @@ export default function (pi: ExtensionAPI) {
   // Commands: /budget（无参数 = 总览） / /budget set / /budget unset
   // ────────────────────────────────────────────────────────────────────────
   pi.registerCommand("budget", {
-    description: "AI 成本预算管理：/budget | /budget set <amount> | /budget report [range] | /budget by <dim>",
+    description: "AI cost budget manager: /budget | /budget set <amount> | /budget report [range]",
     handler: async (args, ctx) => {
       const trimmed = (args ?? "").trim();
 
@@ -368,8 +372,12 @@ export default function (pi: ExtensionAPI) {
         await runWidgetCommand(ctx);
         return;
       }
+      if (sub === "export") {
+        await runExportCmd(restStr, ctx);
+        return;
+      }
 
-      const help = `未知子命令: ${sub}\n支持的子命令：widget / set / unset / report / by / config`;
+      const help = `Unknown sub-command: ${sub}\nAvailable: widget / set / unset / report / by / config / export`;
       ctx.ui.notify(help, "warning");
     },
   });
@@ -396,7 +404,7 @@ export default function (pi: ExtensionAPI) {
     });
 
     // 2. 今日报表
-    let report = "（暂无数据）";
+    let report = `(${t("report.noData")})`;
     try {
       const db = await getDb();
       const since = rangeToSince("today");
@@ -416,26 +424,24 @@ export default function (pi: ExtensionAPI) {
     // 3. Widget 摘要
     const wc = widgetConfig();
     const widgetSummary = [
-      `当前模式：${wc.compact ? "极简" : wc.showModel !== false ? "丰富" : "自定义"}`,
-      `位置：${wc.placement === "aboveEditor" ? "编辑器上方" : "输入框下方"}`,
-      `模型名：${wc.showModel !== false ? "显示" : "隐藏"}`,
-      `进度条：${wc.showProgressBar !== false ? "显示" : "隐藏"}`,
-      `上下文：${wc.showContextWindow !== false ? "显示" : "隐藏"}`,
-      `货币：${wc.currencySymbol ?? "$"}`,
+      `${t("widget.config.placement")}: ${wc.placement === "aboveEditor" ? t("widget.placement.aboveEditor") : t("widget.placement.belowEditor")}`,
+      `${t("widget.config.showModel")}: ${wc.showModel !== false ? "On" : "Off"}`,
+      `${t("widget.config.showProgress")}: ${wc.showProgressBar !== false ? "On" : "Off"}`,
+      `${t("widget.config.showContext")}: ${wc.showContextWindow !== false ? "On" : "Off"}`,
+      `${t("widget.config.currency")}: ${wc.currencySymbol ?? "$"}`,
       "",
-      "💡 按 ← → 切换标签浏览全部内容",
-      "💡 /budget widget 可交互编辑外观",
+      `💡 ${t("dashboard.hint")}`,
     ].join("\n");
 
     // 4. 配置摘要
     const configSummary = [
-      `软限行为：${config.onSoftLimit === "notify" ? "通知" : config.onSoftLimit === "pause" ? "弹窗" : "降级"}`,
-      `软限阈值：${Math.round(config.softLimitRatio * 100)}%`,
-      `硬限行为：${config.onHardLimit === "pause" ? "弹窗" : "终止"}`,
-      `项目识别：${config.projectIdOverride ? "自定义" : "自动（git remote）"}`,
-      `调试日志：${config.debug ? "开启" : "关闭"}`,
+      `${t("config.softLimitBehavior")}: ${config.onSoftLimit === "pause" ? "Popup" : "Notify"}`,
+      `${t("config.softLimitThreshold")}: ${Math.round(config.softLimitRatio * 100)}%`,
+      `${t("config.hardLimitBehavior")}: ${config.onHardLimit === "abort" ? "Terminate" : "Popup"}`,
+      `${t("config.projectId")}: ${config.projectIdOverride ? t("config.custom") : t("config.auto")}`,
+      `${t("config.debugLog")}: ${config.debug ? t("config.widgetSummary.debug.on") : t("config.widgetSummary.debug.off")}`,
       "",
-      "💡 /budget config 可交互编辑设置",
+      `💡 /budget config`,
     ].join("\n");
 
     await ctx.ui.custom<void>((_tui, theme, _kb, done) => {
@@ -450,8 +456,7 @@ export default function (pi: ExtensionAPI) {
   async function runSetCommand(args: string, ctx: ExtensionCommandContext): Promise<void> {
     const parsed = parseSetArgs(args);
     if (!parsed) {
-      const usage = "用法：\n  /budget set <amount>\n  /budget set project <amount>\n  /budget set global <amount>";
-      ctx.ui.notify(usage, "warning");
+      ctx.ui.notify(t("set.usage"), "warning");
       return;
     }
     config = applySet(parsed, config);
@@ -471,7 +476,7 @@ export default function (pi: ExtensionAPI) {
       }
       refreshWidget(uiRef, ctx, usedUsd);
     }
-    ctx.ui.notify(`已设置 ${parsed.scope} 预算 = ${fmtUsd(parsed.amount)}`, "info");
+    ctx.ui.notify(t("set.budgetSet", { scope: parsed.scope, amount: fmtUsd(parsed.amount) }), "info");
   }
 
   async function runUnsetCommand(args: string, ctx: ExtensionCommandContext): Promise<void> {
@@ -488,7 +493,8 @@ export default function (pi: ExtensionAPI) {
       }
       refreshWidget(uiRef, ctx, usedUsd);
     }
-    ctx.ui.notify(`已清除 ${scope === "all" ? "全部" : scope} 预算`, "info");
+    const scopeLabel = scope === "all" ? t("set.budgetClearedAll") : t("set.budgetCleared", { scope });
+    ctx.ui.notify(scopeLabel, "info");
   }
 
   async function runReportCommand(args: string, ctx: ExtensionCommandContext): Promise<void> {
@@ -503,7 +509,7 @@ export default function (pi: ExtensionAPI) {
       const db = await getDb();
       await runReport(db, range, ctx);
     } catch (err) {
-      ctx.ui.notify(`报表生成失败: ${(err as Error).message}`, "error");
+      ctx.ui.notify(t("report.generationFailed") + `: ${(err as Error).message}`, "error");
     }
   }
 
@@ -512,7 +518,7 @@ export default function (pi: ExtensionAPI) {
     const dim = parseByDim(parts[0]);
     if (!dim) {
       ctx.ui.notify(
-        "用法：/budget by <model|tool|session> [today|week|month|all]\n例：/budget by tool\n     /budget by model week",
+        "Usage: /budget by <model|tool|session> [today|week|month|all]",
         "warning",
       );
       return;
@@ -527,7 +533,7 @@ export default function (pi: ExtensionAPI) {
       const db = await getDb();
       await runBy(db, dim, range, ctx);
     } catch (err) {
-      ctx.ui.notify(`切片生成失败: ${(err as Error).message}`, "error");
+      ctx.ui.notify(`Slice view failed: ${(err as Error).message}`, "error");
     }
   }
 
@@ -536,7 +542,7 @@ export default function (pi: ExtensionAPI) {
       config = await openFullSettings(config, ctx.ui, (c) => { config = c; });
       refreshWidgetAfterConfig(ctx);
     } catch (err) {
-      ctx.ui.notify(`设置错误: ${(err as Error).message}`, "error");
+      ctx.ui.notify(`Settings error: ${(err as Error).message}`, "error");
     }
   }
 
@@ -545,17 +551,30 @@ export default function (pi: ExtensionAPI) {
       config = await openWidgetSettings(config, ctx.ui, (c) => { config = c; });
       refreshWidgetAfterConfig(ctx);
     } catch (err) {
-      ctx.ui.notify(`设置错误: ${(err as Error).message}`, "error");
+      ctx.ui.notify(`Settings error: ${(err as Error).message}`, "error");
     }
   }
 
   function refreshWidgetAfterConfig(ctx: ExtensionCommandContext): void {
+    // 配置可能改变了 locale，同步更新
+    if (config.locale) setLocale(config.locale);
     if (!uiRef) return;
     const sessionId = getSessionId(ctx);
     let usedUsd = 0;
     try {
       getDb().then((db) => { usedUsd = createTracker(db).sessionUsd(sessionId); refreshWidget(uiRef!, ctx, usedUsd); });
     } catch { /* ignore */ }
+  }
+
+  async function runExportCmd(args: string, ctx: ExtensionCommandContext): Promise<void> {
+    const format = parseExportFormat(args.trim().split(/\s+/)[0]);
+    try {
+      const db = await getDb();
+      const result = await runExportCommand(db, format, getSessionId(ctx));
+      ctx.ui.notify(result, "info");
+    } catch (err) {
+      ctx.ui.notify(`${t("export.error")}: ${(err as Error).message}`, "error");
+    }
   }
 
   // 防 TS unused
