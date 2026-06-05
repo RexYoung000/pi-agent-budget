@@ -6,6 +6,7 @@
  */
 
 import type { Theme } from "@earendil-works/pi-coding-agent";
+import { visibleWidth, truncateToWidth } from "@earendil-works/pi-tui";
 
 import type { WidgetConfig, BudgetConfig } from "../config.js";
 
@@ -78,23 +79,24 @@ export function createDashboard(
     render(width: number) {
       const lines: string[] = [];
 
-      // 标题栏
-      lines.push(theme.fg("accent", "┌─ pi-budget ─────────────────" + "─".repeat(Math.max(0, width - 30)) + "┐"));
+      // 标题栏（前缀 "┌─ pi-budget " = 14 字符 + 后缀 "┐" = 1 字符，剩 width-15 用 ─ 填充）
+      lines.push(theme.fg("accent", "┌─ pi-budget " + "─".repeat(Math.max(0, width - 15)) + "┐"));
 
-      // 标签
+      // 标签（用 visibleWidth 避免 ANSI 码干扰宽度计算）
       const tabLine = renderTabs(activeTab, theme)[0] ?? "";
-      lines.push(`│ ${tabLine}` + " ".repeat(Math.max(0, width - tabLine.length - 3)) + "│");
+      const tabLineVis = visibleWidth(tabLine);
+      lines.push(`│ ${tabLine}` + " ".repeat(Math.max(0, width - tabLineVis - 3)) + "│");
 
       // 分隔
       lines.push(`│${theme.fg("dim", "─".repeat(width - 2))}│`);
 
-      // 内容
+      // 内容（用 truncateToWidth 截断 + visibleWidth 对齐）
       const content = renderContent(activeTab, input, MAX_CONTENT);
       for (const line of content) {
-        // 去掉每行已有的前导空格后补空格对齐
         const trimmed = line.replace(/^\s+/, "");
-        const pad = width - trimmed.length - 3;
-        lines.push(`│ ${trimmed}${" ".repeat(Math.max(0, pad))}│`);
+        const safe = truncateToWidth(trimmed, width - 3);
+        const pad = width - visibleWidth(safe) - 3;
+        lines.push(`│ ${safe}${" ".repeat(Math.max(0, pad))}│`);
       }
 
       // 空行填充剩余空间（让卡片高度一致）
@@ -103,12 +105,11 @@ export function createDashboard(
         lines.push(`│${" ".repeat(width - 2)}│`);
       }
 
-      // 底部提示
-      // ------
-      // 底部提示
+      // 底部提示（用 visibleWidth 避免 ANSI 码干扰宽度计算）
       lines.push(`│${theme.fg("dim", "─".repeat(width - 2))}│`);
       const hint = theme.fg("dim", "← → 切换标签    ESC 退出    /budget widget 编辑外观");
-      lines.push(`│ ${hint}${" ".repeat(Math.max(0, width - hint.length - 3))}│`);
+      const hintVis = visibleWidth(hint);
+      lines.push(`│ ${hint}${" ".repeat(Math.max(0, width - hintVis - 3))}│`);
       lines.push(theme.fg("accent", "└" + "─".repeat(width - 2) + "┘"));
 
       return lines;

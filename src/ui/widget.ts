@@ -116,12 +116,15 @@ export function renderWidgetLines(state: WidgetState, wc: WidgetConfig, theme?: 
   parts.push(costParts.join(" "));
 
   const mainLine = maybeColor(theme, color, parts.join(" │ "));
-  const lines = [mainLine];
+  const lines: string[] = [];
 
-  // 上下文窗口（第二行）
+  // 上下文窗口（附加到同一行，横排）
   if (wc.showContextWindow && state.context) {
     const ctxLine = renderContextLine(state.context);
-    lines.push(maybeColor(theme, "dim", `  ${ctxLine}`));
+    // 主信息用 level 颜色，上下文窗口保持 dim
+    lines.push(mainLine + "  " + maybeColor(theme, "dim", ctxLine));
+  } else {
+    lines.push(mainLine);
   }
 
   return lines;
