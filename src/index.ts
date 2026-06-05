@@ -29,6 +29,7 @@ import {
   fmtUsd,
 } from "./commands/set.js";
 import { renderOverview, type OverviewInput } from "./commands/overview.js";
+import { parseRange, parseByDim, runReport, runBy, type ReportRange } from "./commands/report.js";
 
 export default function (pi: ExtensionAPI) {
   // ────────────────────────────────────────────────────────────────────────
@@ -320,7 +321,7 @@ export default function (pi: ExtensionAPI) {
   // Commands: /budget（无参数 = 总览） / /budget set / /budget unset
   // ────────────────────────────────────────────────────────────────────────
   pi.registerCommand("budget", {
-    description: "AI 成本预算管理：/budget | /budget set <amount> | /budget unset",
+    description: "AI 成本预算管理：/budget | /budget set <amount> | /budget report [range] | /budget by <dim>",
     handler: async (args, ctx) => {
       const trimmed = (args ?? "").trim();
 
@@ -341,8 +342,16 @@ export default function (pi: ExtensionAPI) {
         await runUnsetCommand(restStr, ctx);
         return;
       }
+      if (sub === "report") {
+        await runReportCommand(restStr, ctx);
+        return;
+      }
+      if (sub === "by") {
+        await runByCommand(restStr, ctx);
+        return;
+      }
 
-      const help = `未知子命令: ${sub}\n支持的子命令：set / unset（其他子命令将在后续 MVP 步骤实现）`;
+      const help = `未知子命令: ${sub}\n支持的子命令：set / unset / report / by`;
       ctx.ui.notify(help, "warning");
     },
   });
@@ -411,6 +420,46 @@ export default function (pi: ExtensionAPI) {
       refreshWidget(uiRef, ctx, usedUsd);
     }
     ctx.ui.notify(`已清除 ${scope === "all" ? "全部" : scope} 预算`, "info");
+  }
+
+  async function runReportCommand(args: string, ctx: ExtensionCommandContext): Promise<void> {
+    let range: ReportRange;
+    try {
+      range = parseRange(args.trim().split(/\s+/)[0]);
+    } catch (err) {
+      ctx.ui.notify((err as Error).message, "warning");
+      return;
+    }
+    try {
+      const db = await getDb();
+      await runReport(db, range, ctx);
+    } catch (err) {
+      ctx.ui.notify(`报表生成失败: ${(err as Error).message}`, "error");
+    }
+  }
+
+  async function runByCommand(args: string, ctx: ExtensionCommandContext): Promise<void> {
+    const parts = args.trim().split(/\s+/);
+    const dim = parseByDim(parts[0]);
+    if (!dim) {
+      ctx.ui.notify(
+        "用法：/budget by <model|tool|session> [today|week|month|all]\n例：/budget by tool\n     /budget by model week",
+        "warning",
+      );
+      return;
+    }
+    let range: ReportRange;
+    try {
+      range = parseRange(parts[1]);
+    } catch {
+      range = "all"; // by 命令默认全量
+    }
+    try {
+      const db = await getDb();
+      await runBy(db, dim, range, ctx);
+    } catch (err) {
+      ctx.ui.notify(`切片生成失败: ${(err as Error).message}`, "error");
+    }
   }
 
   // 防 TS unused

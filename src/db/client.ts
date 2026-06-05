@@ -163,6 +163,26 @@ export class BudgetDb {
     return stmt.all(since);
   }
 
+  /** 拿时间窗口内的总 USD + 请求数。 */
+  getTotals(since: number = 0): { usd: number; requests: number } {
+    const row = this.db
+      .prepare<[number], { usd: number | null; requests: number }>(
+        "SELECT COALESCE(SUM(cost_total), 0) AS usd, COUNT(*) AS requests FROM costs WHERE timestamp >= ?",
+      )
+      .get(since);
+    return { usd: row?.usd ?? 0, requests: row?.requests ?? 0 };
+  }
+
+  /** 拿时间窗口内独立 session 数（DISTINCT session_id）。 */
+  countSessions(since: number = 0): number {
+    const row = this.db
+      .prepare<[number], { n: number }>(
+        "SELECT COUNT(DISTINCT session_id) AS n FROM costs WHERE timestamp >= ?",
+      )
+      .get(since);
+    return row?.n ?? 0;
+  }
+
   // ── Budgets ──────────────────────────────────────────────────────────
 
   setBudget(row: Omit<BudgetRow, "updatedAt">): void {
