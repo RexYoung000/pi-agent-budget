@@ -32,6 +32,61 @@ export interface Translations {
   "dashboard.hint": string;
   "dashboard.truncated": string;
 
+  "dashboard.tab.budget": string;
+  "dashboard.tab.pricing": string;
+  "dashboard.hint.overview": string;
+  "dashboard.hint.interactive": string;
+
+  // ── status labels ──
+  "status.ok": string;
+  "status.soft": string;
+  "status.hard": string;
+
+  // ── overview additions ──
+  "overview.sessionCost": string;
+  "overview.sessionContext": string;
+  "overview.modelContext": string;
+  "overview.contextUnavailable": string;
+  "overview.contextPercent": string;
+  "overview.inputTokens": string;
+  "overview.outputTokens": string;
+
+  // ── budget TUI ──
+  "budget.sessionBudget": string;
+  "budget.sessionBudget.description": string;
+  "budget.clearSession": string;
+  "budget.clearSession.description": string;
+  "budget.value.unset": string;
+  "budget.action.ready": string;
+  "budget.action.clear": string;
+
+  // ── pricing ──
+  "pricing.anchor": string;
+  "pricing.anchor.followModel": string;
+  "pricing.anchor.cny": string;
+  "pricing.anchor.usd": string;
+  "pricing.anchor.description": string;
+  "pricing.currentModel": string;
+  "pricing.currentModel.description": string;
+  "pricing.provider": string;
+  "pricing.provider.description": string;
+  "pricing.provider.unknown": string;
+  "pricing.nativeCurrency": string;
+  "pricing.nativeCurrency.description": string;
+  "pricing.displayCurrency": string;
+  "pricing.displayCurrency.description": string;
+  "pricing.currency.cny": string;
+  "pricing.currency.usd": string;
+  "pricing.priceDate": string;
+  "pricing.priceDate.description": string;
+  "pricing.fxDate": string;
+  "pricing.fxDate.description": string;
+  "pricing.fxDate.notNeeded": string;
+  "pricing.updateToday": string;
+  "pricing.updateToday.description": string;
+  "pricing.status.latest": string;
+  "pricing.action.update": string;
+
   // ── overview ──
   "overview.session": string;
   "overview.model": string;
@@ -187,17 +242,63 @@ const en: Translations = {
   "dashboard.tab.report": "Report",
   "dashboard.tab.appearance": "Appearance",
   "dashboard.tab.settings": "Settings",
-  "dashboard.hint": "← → switch tab    ESC exit    /budget widget edit appearance",
+  "dashboard.hint": "← → switch tab    ESC exit",
+  "dashboard.tab.budget": "Budget",
+  "dashboard.tab.pricing": "Pricing",
+  "dashboard.hint.overview": "← → switch tab    ESC exit",
+  "dashboard.hint.interactive": "← → switch tab    ↑↓ select    Enter change    ESC exit",
   "dashboard.truncated": "... (truncated from {total} lines)",
 
-  "overview.session": "Session",
-  "overview.model": "Model",
-  "overview.last": "Last",
-  "overview.status": "Status",
+  "overview.session": "会话",
+  "overview.model": "模型",
+  "overview.last": "上次请求",
+  "overview.status": "状态",
   "overview.noBudget": "no budget",
-  "overview.hintSetBudget": 'Tip: use `/budget set <usd>` to set session budget',
+  "overview.hintSetBudget": "Tip: switch to Budget to set it here.",
   "overview.estRemaining": "~{count} more similar requests estimated",
   "overview.statusOk": "ok",
+  "status.ok": "Normal",
+  "status.soft": "Near budget",
+  "status.hard": "Limit reached",
+  "overview.sessionCost": "Session cost",
+  "overview.sessionContext": "Session context",
+  "overview.modelContext": "Model context",
+  "overview.contextUnavailable": "Not available",
+  "overview.contextPercent": "{pct}% used",
+  "overview.inputTokens": "in {count}",
+  "overview.outputTokens": "out {count}",
+  "budget.sessionBudget": "Session budget",
+  "budget.sessionBudget.description": "Set the budget for this session. Presets follow the current display currency: {currency}.",
+  "budget.clearSession": "Clear session budget",
+  "budget.clearSession.description": "Remove the current session budget. Cost tracking continues, but no limit is enforced.",
+  "budget.value.unset": "Unset",
+  "budget.action.ready": "Ready",
+  "budget.action.clear": "Clear",
+  "pricing.anchor": "Pricing anchor",
+  "pricing.anchor.followModel": "Follow model",
+  "pricing.anchor.cny": "Unified CNY",
+  "pricing.anchor.usd": "Unified USD",
+  "pricing.anchor.description": "Follow model keeps domestic models in CNY and overseas models in USD. Unified modes convert display to one currency.",
+  "pricing.currentModel": "Current model",
+  "pricing.currentModel.description": "Model name detected from the current session.",
+  "pricing.provider": "Provider",
+  "pricing.provider.description": "Provider inferred from the model name.",
+  "pricing.provider.unknown": "Unknown provider",
+  "pricing.nativeCurrency": "Native currency",
+  "pricing.nativeCurrency.description": "The model provider’s original billing currency.",
+  "pricing.displayCurrency": "Display currency",
+  "pricing.displayCurrency.description": "Currency used in the TUI and widget display.",
+  "pricing.currency.cny": "CNY / ¥",
+  "pricing.currency.usd": "USD / $",
+  "pricing.priceDate": "Price date",
+  "pricing.priceDate.description": "Date of the built-in price table used by this extension.",
+  "pricing.fxDate": "FX date",
+  "pricing.fxDate.description": "Exchange-rate date used only when display currency differs from native currency.",
+  "pricing.fxDate.notNeeded": "Not needed",
+  "pricing.updateToday": "Update to today",
+  "pricing.updateToday.description": "Mark the built-in price table and FX date as updated to today. Remote fetching can be added later.",
+  "pricing.status.latest": "Latest",
+  "pricing.action.update": "Update",
 
   "report.title": "Budget Report",
   "report.col.model": "Model",
@@ -235,7 +336,7 @@ const en: Translations = {
   "set.raisedTo": "Budget raised to {amount}",
   "set.sessionEnded": "Session ended (user terminated)",
   "set.continued": "Continuing, will block again at hard limit",
-  "set.hardLimitBlocked": "Hard limit reached — message not sent (use /budget set to raise budget)",
+  "set.hardLimitBlocked": "Hard limit reached — message not sent. Open Budget to raise it.",
 
   "config.title": "Budget Settings",
   "config.softLimitBehavior": "Soft limit behavior",
@@ -272,7 +373,7 @@ const en: Translations = {
   "widget.config.showContext": "Show context window",
   "widget.config.currency": "Currency symbol",
   "widget.config.livePreview": "Live Preview",
-  "widget.config.hintNav": "← → switch tab    ESC exit    /budget widget edit appearance",
+  "widget.config.hintNav": "← → switch tab    ESC exit",
   "widget.config.hintEdit": "/budget widget to edit interactively",
   "widget.config.mode": "Display mode",
   "widget.config.modeFull": "Full",
@@ -282,7 +383,7 @@ const en: Translations = {
   "widget.config.currencyDescription": "Prefix before cost numbers. Cosmetic only (pi uses USD internally).\nPreview: {sym}0.42",
   "widget.config.showModelDescription": "Show current AI model name on widget.\nPreview: {on}",
   "widget.config.showProgressDescription": "Show budget bar with █ and ░. Color changes: green → cyan → orange → red.\nPreview: {on}",
-  "widget.config.showContextDescription": "Show context window usage (tokens / limit + %).\nPreview: 📊 28K/200K (14%)",
+  "widget.config.showContextDescription": "Show context window usage (tokens / limit + %).\nPreview: │ 28K/200K (14%)",
   "value.on": "On",
   "value.off": "Off",
 
@@ -329,17 +430,63 @@ const zhCN: Translations = {
   "dashboard.tab.report": "报表",
   "dashboard.tab.appearance": "外观",
   "dashboard.tab.settings": "设置",
-  "dashboard.hint": "← → 切换标签    ESC 退出    /budget widget 编辑外观",
+  "dashboard.hint": "← → 切换标签    ESC 退出",
+  "dashboard.tab.budget": "预算",
+  "dashboard.tab.pricing": "价格表",
+  "dashboard.hint.overview": "← → 切换标签    ESC 退出",
+  "dashboard.hint.interactive": "← → 切换标签    ↑↓ 选择    Enter 修改    ESC 退出",
   "dashboard.truncated": "... (共 {total} 行，已截断)",
 
-  "overview.session": "Session",
-  "overview.model": "Model",
-  "overview.last": "Last",
-  "overview.status": "Status",
+  "overview.session": "会话",
+  "overview.model": "模型",
+  "overview.last": "上次请求",
+  "overview.status": "状态",
   "overview.noBudget": "无预算",
-  "overview.hintSetBudget": "提示：用 `/budget set <usd>` 设置本会话预算",
+  "overview.hintSetBudget": "还没有预算时，可切到「预算」页直接设置。",
   "overview.estRemaining": "预计还可发起 ~{count} 次类似请求",
   "overview.statusOk": "正常",
+  "status.ok": "正常",
+  "status.soft": "接近预算",
+  "status.hard": "上限到達",
+  "overview.sessionCost": "当前会话花费",
+  "overview.sessionContext": "Session 上下文",
+  "overview.modelContext": "模型上下文",
+  "overview.contextUnavailable": "取得できません",
+  "overview.contextPercent": "{pct}% 使用",
+  "overview.inputTokens": "入力 {count}",
+  "overview.outputTokens": "出力 {count}",
+  "budget.sessionBudget": "本次会话预算",
+  "budget.sessionBudget.description": "设置本次会话预算。档位会跟随当前展示币种：{currency}。",
+  "budget.clearSession": "清除本次预算",
+  "budget.clearSession.description": "清除当前会话预算。花费仍会记录，但不会触发预算限制。",
+  "budget.value.unset": "未设置",
+  "budget.action.ready": "待機中",
+  "budget.action.clear": "清除",
+  "pricing.anchor": "价格锚点",
+  "pricing.anchor.followModel": "跟随模型",
+  "pricing.anchor.cny": "CNYに統一",
+  "pricing.anchor.usd": "USDに統一",
+  "pricing.anchor.description": "跟随模型会让国内模型用人民币、海外模型用美元；统一模式会把展示口径固定为一种币种。",
+  "pricing.currentModel": "当前模型",
+  "pricing.currentModel.description": "从当前会话识别到的模型名称。",
+  "pricing.provider": "プロバイダー",
+  "pricing.provider.description": "根据模型名推断出的服务商。",
+  "pricing.provider.unknown": "不明なプロバイダー",
+  "pricing.nativeCurrency": "元の課金通貨",
+  "pricing.nativeCurrency.description": "模型服务商原始账单使用的币种。",
+  "pricing.displayCurrency": "表示通貨",
+  "pricing.displayCurrency.description": "TUI と Widget で表示する通貨。",
+  "pricing.currency.cny": "CNY / ¥",
+  "pricing.currency.usd": "USD / $",
+  "pricing.priceDate": "价格表日期",
+  "pricing.priceDate.description": "当前扩展内置价格表对应的日期。",
+  "pricing.fxDate": "汇率日期",
+  "pricing.fxDate.description": "仅当展示币种不同于模型原生币种时使用。",
+  "pricing.fxDate.notNeeded": "不要",
+  "pricing.updateToday": "更新到今日价格表",
+  "pricing.updateToday.description": "把内置价格表和汇率状态标记为今天。后续可扩展远程拉取。",
+  "pricing.status.latest": "最新",
+  "pricing.action.update": "更新",
 
   "report.title": "预算报告",
   "report.col.model": "模型",
@@ -424,7 +571,7 @@ const zhCN: Translations = {
   "widget.config.currencyDescription": "成本数字前面的符号。只是显示样式，不做汇率换算（pi 内部统一用 USD 计价）。\n预览：{sym}0.42",
   "widget.config.showModelDescription": "打开后 Widget 第一行会显示当前使用的 AI 模型。\n预览：{on}",
   "widget.config.showProgressDescription": "打开后 Widget 用 █ 和 ░ 直观展示预算消耗进度。颜色随消耗自动变化：绿→青→橙→红。\n预览：{on}",
-  "widget.config.showContextDescription": "打开后 Widget 显示当前会话的上下文使用情况。\n预览：📊 28K/200K (14%)",
+  "widget.config.showContextDescription": "打开后 Widget 显示当前会话的上下文使用情况。\n预览：│ 28K/200K (14%)",
   "value.on": "开启",
   "value.off": "关闭",
 
@@ -471,17 +618,63 @@ const ja: Translations = {
   "dashboard.tab.report": "レポート",
   "dashboard.tab.appearance": "表示",
   "dashboard.tab.settings": "設定",
-  "dashboard.hint": "← → タブ切替    ESC 終了    /budget widget 表示編集",
+  "dashboard.hint": "← → タブ切替    ESC 終了",
+  "dashboard.tab.budget": "予算",
+  "dashboard.tab.pricing": "価格表",
+  "dashboard.hint.overview": "← → タブ切替    ESC 終了",
+  "dashboard.hint.interactive": "← → タブ切替    ↑↓ 選択    Enter 変更    ESC 終了",
   "dashboard.truncated": "... ({total}行中、切り捨て)",
 
-  "overview.session": "Session",
-  "overview.model": "Model",
-  "overview.last": "Last",
-  "overview.status": "Status",
+  "overview.session": "会话",
+  "overview.model": "模型",
+  "overview.last": "上次请求",
+  "overview.status": "状态",
   "overview.noBudget": "予算なし",
-  "overview.hintSetBudget": "ヒント: `/budget set <usd>` でセッション予算を設定",
+  "overview.hintSetBudget": "未設定の場合は「予算」タブで直接設定できます。",
   "overview.estRemaining": "あと約{count}回の類似リクエストが可能",
   "overview.statusOk": "正常",
+  "status.ok": "正常",
+  "status.soft": "予算に近い",
+  "status.hard": "上限到達",
+  "overview.sessionCost": "セッション費用",
+  "overview.sessionContext": "セッションコンテキスト",
+  "overview.modelContext": "モデルコンテキスト",
+  "overview.contextUnavailable": "取得できません",
+  "overview.contextPercent": "{pct}% 使用",
+  "overview.inputTokens": "入力 {count}",
+  "overview.outputTokens": "出力 {count}",
+  "budget.sessionBudget": "セッション予算",
+  "budget.sessionBudget.description": "このセッションの予算を設定します。プリセットは現在の表示通貨（{currency}）に従います。",
+  "budget.clearSession": "セッション予算をクリア",
+  "budget.clearSession.description": "現在のセッション予算を削除します。費用記録は継続しますが、制限は適用されません。",
+  "budget.value.unset": "未設定",
+  "budget.action.ready": "待機中",
+  "budget.action.clear": "清除",
+  "pricing.anchor": "価格アンカー",
+  "pricing.anchor.followModel": "モデルに追従",
+  "pricing.anchor.cny": "CNYに統一",
+  "pricing.anchor.usd": "USDに統一",
+  "pricing.anchor.description": "モデル追従では中国系モデルはCNY、海外モデルはUSDで表示します。統一モードでは表示通貨を固定します。",
+  "pricing.currentModel": "現在のモデル",
+  "pricing.currentModel.description": "現在のセッションから検出したモデル名。",
+  "pricing.provider": "プロバイダー",
+  "pricing.provider.description": "モデル名から推定した提供元。",
+  "pricing.provider.unknown": "不明なプロバイダー",
+  "pricing.nativeCurrency": "元の課金通貨",
+  "pricing.nativeCurrency.description": "モデル提供元の本来の請求通貨。",
+  "pricing.displayCurrency": "表示通貨",
+  "pricing.displayCurrency.description": "TUI と Widget で表示する通貨。",
+  "pricing.currency.cny": "CNY / ¥",
+  "pricing.currency.usd": "USD / $",
+  "pricing.priceDate": "価格表日付",
+  "pricing.priceDate.description": "この拡張の内蔵価格表の日付。",
+  "pricing.fxDate": "汇率日期",
+  "pricing.fxDate.description": "表示通貨が元の通貨と異なる場合のみ使用。",
+  "pricing.fxDate.notNeeded": "不要",
+  "pricing.updateToday": "今日に更新",
+  "pricing.updateToday.description": "内蔵価格表と為替日付を今日としてマークします。将来リモート取得を追加できます。",
+  "pricing.status.latest": "最新",
+  "pricing.action.update": "更新",
 
   "report.title": "予算レポート",
   "report.col.model": "モデル",
@@ -566,7 +759,7 @@ const ja: Translations = {
   "widget.config.currencyDescription": "コストの前に付く記号。表示のみ（pi は内部的に USD 使用）。\nプレビュー: {sym}0.42",
   "widget.config.showModelDescription": "Widget に現在の AI モデル名を表示。\nプレビュー: {on}",
   "widget.config.showProgressDescription": "Widget に █ と ░ で予算バーを表示。色変化: 緑→シアン→オレンジ→赤。\nプレビュー: {on}",
-  "widget.config.showContextDescription": "コンテキストウィンドウの使用状況を表示。\nプレビュー: 📊 28K/200K (14%)",
+  "widget.config.showContextDescription": "コンテキストウィンドウの使用状況を表示。\nプレビュー: │ 28K/200K (14%)",
   "value.on": "オン",
   "value.off": "オフ",
 
@@ -613,17 +806,63 @@ const ko: Translations = {
   "dashboard.tab.report": "리포트",
   "dashboard.tab.appearance": "표시",
   "dashboard.tab.settings": "설정",
-  "dashboard.hint": "← → 탭 전환    ESC 종료    /budget widget 표시 편집",
+  "dashboard.hint": "← → 탭 전환    ESC 종료",
+  "dashboard.tab.budget": "예산",
+  "dashboard.tab.pricing": "가격표",
+  "dashboard.hint.overview": "← → 탭 전환    ESC 종료",
+  "dashboard.hint.interactive": "← → 탭 전환    ↑↓ 선택    Enter 변경    ESC 종료",
   "dashboard.truncated": "... (총 {total}줄, 잘림)",
 
-  "overview.session": "Session",
-  "overview.model": "Model",
-  "overview.last": "Last",
-  "overview.status": "Status",
+  "overview.session": "会话",
+  "overview.model": "模型",
+  "overview.last": "上次请求",
+  "overview.status": "状态",
   "overview.noBudget": "예산 없음",
-  "overview.hintSetBudget": "팁: `/budget set <usd>`로 세션 예산 설정",
+  "overview.hintSetBudget": "예산이 없으면 ‘예산’ 탭에서 바로 설정할 수 있습니다.",
   "overview.estRemaining": "약 {count}회 유사 요청 가능",
   "overview.statusOk": "정상",
+  "status.ok": "정상",
+  "status.soft": "예산 근접",
+  "status.hard": "한도 도달",
+  "overview.sessionCost": "세션 비용",
+  "overview.sessionContext": "세션 컨텍스트",
+  "overview.modelContext": "모델 컨텍스트",
+  "overview.contextUnavailable": "가져올 수 없음",
+  "overview.contextPercent": "{pct}% 사용",
+  "overview.inputTokens": "입력 {count}",
+  "overview.outputTokens": "출력 {count}",
+  "budget.sessionBudget": "세션 예산",
+  "budget.sessionBudget.description": "이 세션의 예산을 설정합니다. 프리셋은 현재 표시 통화({currency})를 따릅니다.",
+  "budget.clearSession": "세션 예산 해제",
+  "budget.clearSession.description": "현재 세션 예산을 제거합니다. 비용 기록은 계속되지만 제한은 적용되지 않습니다.",
+  "budget.value.unset": "미설정",
+  "budget.action.ready": "대기",
+  "budget.action.clear": "해제",
+  "pricing.anchor": "가격 기준",
+  "pricing.anchor.followModel": "모델 따름",
+  "pricing.anchor.cny": "CNY 통일",
+  "pricing.anchor.usd": "USD 통일",
+  "pricing.anchor.description": "모델 따름은 중국 모델은 CNY, 해외 모델은 USD로 표시합니다. 통일 모드는 표시 통화를 고정합니다.",
+  "pricing.currentModel": "현재 모델",
+  "pricing.currentModel.description": "현재 세션에서 감지한 모델명입니다.",
+  "pricing.provider": "제공사",
+  "pricing.provider.description": "모델명에서 추정한 제공사입니다.",
+  "pricing.provider.unknown": "알 수 없는 제공사",
+  "pricing.nativeCurrency": "원래 과금 통화",
+  "pricing.nativeCurrency.description": "모델 제공사의 원래 청구 통화입니다.",
+  "pricing.displayCurrency": "표시 통화",
+  "pricing.displayCurrency.description": "TUI와 Widget에서 표시할 통화입니다.",
+  "pricing.currency.cny": "CNY / ¥",
+  "pricing.currency.usd": "USD / $",
+  "pricing.priceDate": "가격표 날짜",
+  "pricing.priceDate.description": "이 확장에 내장된 가격표 날짜입니다.",
+  "pricing.fxDate": "환율 날짜",
+  "pricing.fxDate.description": "표시 통화가 원래 통화와 다를 때만 사용됩니다.",
+  "pricing.fxDate.notNeeded": "필요 없음",
+  "pricing.updateToday": "오늘로 업데이트",
+  "pricing.updateToday.description": "내장 가격표와 환율 날짜를 오늘로 표시합니다. 추후 원격 가져오기를 추가할 수 있습니다.",
+  "pricing.status.latest": "최신",
+  "pricing.action.update": "업데이트",
 
   "report.title": "예산 리포트",
   "report.col.model": "모델",
@@ -708,7 +947,7 @@ const ko: Translations = {
   "widget.config.currencyDescription": "비용 앞에 붙는 기호. 표시 전용 (pi는 내부적으로 USD 사용).\n미리보기: {sym}0.42",
   "widget.config.showModelDescription": "현재 AI 모델명을 Widget에 표시.\n미리보기: {on}",
   "widget.config.showProgressDescription": "Widget에 █, ░로 예산 진행률 표시. 색 변화: 녹→시안→주→적.\n미리보기: {on}",
-  "widget.config.showContextDescription": "컨텍스트 창 사용량 표시.\n미리보기: 📊 28K/200K (14%)",
+  "widget.config.showContextDescription": "컨텍스트 창 사용량 표시.\n미리보기: │ 28K/200K (14%)",
   "value.on": "켬",
   "value.off": "끔",
 

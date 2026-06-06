@@ -32,7 +32,8 @@ import {
 } from "./commands/set.js";
 import { renderOverview, type OverviewInput } from "./commands/overview.js";
 import { parseRange, parseByDim, runReport, runBy, rangeToSince, type ReportRange } from "./commands/report.js";
-import { openWidgetSettings, openFullSettings, createSettingsListForDashboard } from "./commands/config.js";
+import { openWidgetSettings, openFullSettings, createSettingsListForDashboard, createBudgetListForDashboard, createPricingListForDashboard } from "./commands/config.js";
+import { getPricingInfo, formatMoney, currencyLabel } from "./core/pricing.js";
 import { parseExportFormat, runExport as runExportCommand } from "./commands/export.js";
 
 export default function (pi: ExtensionAPI) {
@@ -100,10 +101,12 @@ export default function (pi: ExtensionAPI) {
     currentModelDisplay = modelDisplay;
     const wc = widgetConfig();
     const context = ctx.getContextUsage?.();
+    const pricing = getPricingInfo(config, modelDisplay);
     const state: WidgetState = {
       model: modelDisplay,
       usedUsd,
       budgetUsd: config.session?.usd ?? 0,
+      currencySymbol: pricing.symbol,
       context: context ? { tokens: context.tokens, contextWindow: context.contextWindow, percent: context.percent } : undefined,
     };
     createWidgetRenderer({ ui, config: wc }).refresh(state);
@@ -390,69 +393,51 @@ export default function (pi: ExtensionAPI) {
       usedUsd = createTracker(db).sessionUsd(sessionId);
     } catch { /* ignore */ }
 
+    const modelName = ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay;
+    const pricing = getPricingInfo(config, modelName);
     const budgetUsd = config.session?.usd;
     const status = checkSessionLimit(usedUsd, budgetUsd ?? 0, config);
+    const context = ctx.getContextUsage?.();
 
-    // 1. 概览
-    const overview = renderOverview({
-      sessionId,
-      usedUsd,
-      budgetUsd,
-      model: ctx.model?.name ?? ctx.model?.id,
-      lastRequest: lastRequestSnap,
-      status,
-    });
-
-    // 2. 今日报表
-    let report = `(${t("report.noData")})`;
-    try {
-      const db = await getDb();
-      const since = rangeToSince("today");
-      const { renderReport } = await import("./ui/report.js");
-      const totals = db.getTotals(since);
-      const sessions = db.countSessions(since);
-      report = renderReport({
-        range: "today",
-        since,
-        until: Date.now(),
-        totals: { usd: totals.usd, sessions, requests: totals.requests },
-        byModel: db.aggregateBy("model", since),
-        byTool: db.aggregateBy("tool", since),
-      });
-    } catch { /* ignore */ }
-
-    // 3. Widget 摘要
-    const wc = widgetConfig();
-    const widgetSummary = [
-      `${t("widget.config.placement")}: ${wc.placement === "aboveEditor" ? t("widget.placement.aboveEditor") : t("widget.placement.belowEditor")}`,
-      `${t("widget.config.showModel")}: ${wc.showModel !== false ? t("value.on") : t("value.off")}`,
-      `${t("widget.config.showProgress")}: ${wc.showProgressBar !== false ? t("value.on") : t("value.off")}`,
-      `${t("widget.config.showContext")}: ${wc.showContextWindow !== false ? t("value.on") : t("value.off")}`,
-      `${t("widget.config.currency")}: ${wc.currencySymbol ?? "$"}`,
-      "",
-      `💡 ${t("dashboard.hint")}`,
-    ].join("\n");
-
-    // 4. 配置摘要
-    const configSummary = [
-      `${t("config.softLimitBehavior")}: ${config.onSoftLimit === "pause" ? t("config.widgetSummary.onSoftLimit.pause") : t("config.widgetSummary.onSoftLimit.notify")}`,
-      `${t("config.softLimitThreshold")}: ${Math.round(config.softLimitRatio * 100)}%`,
-      `${t("config.hardLimitBehavior")}: ${config.onHardLimit === "abort" ? t("config.widgetSummary.onHardLimit.terminate") : t("config.widgetSummary.onHardLimit.pause")}`,
-      `${t("config.projectId")}: ${config.projectIdOverride ? t("config.custom") : t("config.auto")}`,
-      `${t("config.debugLog")}: ${config.debug ? t("config.widgetSummary.debug.on") : t("config.widgetSummary.debug.off")}`,
-      `${t("config.locale")}: ${config.locale ?? "en"}`,
-      "",
-      `💡 /budget config`,
-    ].join("\n");
+    const overviewText = () => {
+      const lines: string[] = [];
+      lines.push(`${t("overview.sessionCost")}: ${formatMoney(usedUsd, pricing.displayCurrency)}${budgetUsd && budgetUsd > 0 ? ` / ${formatMoney(budgetUsd, pricing.displayCurrency)}` : ` (${t("overview.noBudget")})`}`);
+      lines.push(`${t("overview.model")}: ${modelName || t("report.unknown")}`);
+      lines.push(`${t("pricing.nativeCurrency")}: ${currencyLabel(pricing.nativeCurrency)}`);
+      lines.push(`${t("overview.sessionContext")}: ${sessionId}`);
+      if (lastRequestSnap) {
+        lines.push(`${t("overview.last")}: ${formatMoney(lastRequestSnap.costUsd, pricing.displayCurrency)} (${t("overview.inputTokens", { count: lastRequestSnap.inputTokens })} / ${t("overview.outputTokens", { count: lastRequestSnap.outputTokens })})`);
+      }
+      if (context) {
+        const tokens = context.tokens ?? 0;
+        const pct = context.percent != null ? `, ${t("overview.contextPercent", { pct: Math.round(context.percent) })}` : "";
+        lines.push(`${t("overview.modelContext")}: ${tokens}/${context.contextWindow}${pct}`);
+      } else {
+        lines.push(`${t("overview.modelContext")}: ${t("overview.contextUnavailable")}`);
+      }
+      const statusKey = status?.level === "hard" ? "status.hard" : status?.level === "soft" ? "status.soft" : "status.ok";
+      lines.push(`${t("overview.status")}: ${t(statusKey)}`);
+      lines.push("");
+      lines.push(t("overview.hintSetBudget"));
+      return lines.join("\n");
+    };
 
     await ctx.ui.custom<void>((_tui, theme, _kb, done) => {
       return createDashboard(
-        { overview, report, widgetSummary, configSummary },
+        { overview: overviewText },
         theme,
         {
-          settingsFactory: () => createSettingsListForDashboard(config, (c) => {
+          budgetFactory: () => createBudgetListForDashboard(config, modelName, (c) => {
             config = c;
-            if (config.locale) setLocale(config.locale);
+            refreshWidgetAfterConfig(ctx);
+          }),
+          pricingFactory: () => createPricingListForDashboard(config, modelName, (c) => {
+            config = c;
+            refreshWidgetAfterConfig(ctx);
+          }),
+          settingsFactory: () => createSettingsListForDashboard(config, modelName, (c) => {
+            config = c;
+            refreshWidgetAfterConfig(ctx);
           }),
         },
         () => done(),

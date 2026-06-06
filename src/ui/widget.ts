@@ -26,6 +26,8 @@ export interface WidgetState {
     contextWindow: number;
     percent: number | null;
   };
+  /** 展示用货币符号，由价格锚点决定。 */
+  currencySymbol?: string;
 }
 
 /** 根据 used/budget 算出等级。 */
@@ -57,13 +59,13 @@ export function renderProgressBar(ratio: number, width: number): string {
   return "█".repeat(filled) + "░".repeat(width - filled);
 }
 
-/** 渲染上下文窗口：📊 28K/200K (14%) */
+/** 渲染上下文窗口：28K/200K (14%) */
 export function renderContextLine(ctx: NonNullable<WidgetState["context"]>): string {
   const { tokens, contextWindow, percent } = ctx;
   const tokStr = tokens != null ? fmtContextTokens(tokens) : "?";
   const winStr = fmtContextTokens(contextWindow);
   const pctStr = percent != null ? ` (${Math.round(percent)}%)` : "";
-  return `📊 ${tokStr}/${winStr}${pctStr}`;
+  return `${tokStr}/${winStr}${pctStr}`;
 }
 
 function fmtContextTokens(n: number): string {
@@ -76,7 +78,7 @@ function fmtContextTokens(n: number): string {
 export function renderWidgetLines(state: WidgetState, wc: WidgetConfig, theme?: Theme): string[] {
   const level = computeLevel(state);
   const color = LEVEL_COLOR[level];
-  const sym = wc.currencySymbol ?? "$";
+  const sym = state.currencySymbol ?? wc.currencySymbol ?? "$";
 
   const dot = level === "hard" ? "🔴" : level === "soft" ? "🟠" : level === "warn" ? "🟡" : "🟢";
 
@@ -118,11 +120,10 @@ export function renderWidgetLines(state: WidgetState, wc: WidgetConfig, theme?: 
   const mainLine = maybeColor(theme, color, parts.join(" │ "));
   const lines: string[] = [];
 
-  // 上下文窗口（附加到同一行，横排）
+  // 上下文窗口（附加到同一行，使用分隔符保持状态栏简洁）
   if (wc.showContextWindow && state.context) {
     const ctxLine = renderContextLine(state.context);
-    // 主信息用 level 颜色，上下文窗口保持 dim
-    lines.push(mainLine + "  " + maybeColor(theme, "dim", ctxLine));
+    lines.push(mainLine + " " + maybeColor(theme, "dim", `│ ${ctxLine}`));
   } else {
     lines.push(mainLine);
   }

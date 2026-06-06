@@ -24,6 +24,13 @@ export interface BudgetConfig {
   softLimitRatio: number; // default 0.8
   hardLimitRatio: number; // default 1.0
 
+  /** 价格锚点：followModel=跟随模型原生币种，cny/usd=统一展示币种。 */
+  pricingAnchor?: "followModel" | "cny" | "usd";
+  /** 价格表更新日期（MVP 为内置价格表状态日期）。 */
+  pricingUpdatedAt?: string;
+  /** 汇率更新日期（仅统一币种展示时使用）。 */
+  fxUpdatedAt?: string;
+
   /** 手填 projectId，覆盖 git remote / cwd 自动识别。救命逃生口。 */
   projectIdOverride?: string;
 
@@ -47,9 +54,9 @@ export interface WidgetConfig {
   showModel?: boolean;
   /** 显示进度条 */
   showProgressBar?: boolean;
-  /** 显示上下文窗口用量（📊 tokens/contextWindow percent%） */
+  /** 显示上下文窗口用量（tokens/contextWindow percent%） */
   showContextWindow?: boolean;
-  /** 货币符号前缀，默认 "$"（仅显示，不做汇率换算） */
+  /** 兼容旧配置：货币符号前缀。新版本优先使用 pricingAnchor 推导。 */
   currencySymbol?: string;
 }
 
@@ -68,6 +75,7 @@ export const DEFAULT_CONFIG: BudgetConfig = {
   softLimitRatio: 0.8,
   hardLimitRatio: 1.0,
   locale: "en",
+  pricingAnchor: "followModel",
 };
 
 /** 读配置；文件不存在 / 解析失败 → 返回 DEFAULT_CONFIG（不抛错，不让扩展崩）。 */
