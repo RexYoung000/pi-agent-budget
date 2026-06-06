@@ -6,7 +6,8 @@
  */
 
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { visibleWidth, truncateToWidth, SettingsList } from "@earendil-works/pi-tui";
+import type { Component } from "@earendil-works/pi-tui";
+import { visibleWidth, truncateToWidth } from "@earendil-works/pi-tui";
 
 import { t } from "../i18n/index.js";
 
@@ -15,9 +16,9 @@ export interface DashboardInput {
 }
 
 export interface DashboardDeps {
-  budgetFactory: () => SettingsList;
-  pricingFactory: () => SettingsList;
-  settingsFactory: () => SettingsList;
+  budgetFactory: () => Component;
+  pricingFactory: () => Component;
+  settingsFactory: () => Component;
 }
 
 function renderTabs(active: number, theme: Theme): string[] {
@@ -52,9 +53,9 @@ export function createDashboard(
 ): { render(width: number): string[]; handleInput(data: string): boolean; invalidate(): void } {
   let activeTab = 0;
   const MAX_CONTENT = 20;
-  const lists: Array<SettingsList | null> = [null, null, null];
+  const lists: Array<Component | null> = [null, null, null];
 
-  function getList(tab: number): SettingsList {
+  function getList(tab: number): Component {
     const idx = tab - 1;
     if (!lists[idx]) {
       lists[idx] = tab === 1 ? deps.budgetFactory() : tab === 2 ? deps.pricingFactory() : deps.settingsFactory();
@@ -62,8 +63,10 @@ export function createDashboard(
     return lists[idx]!;
   }
 
-  function resetList(tab: number): void {
-    if (tab >= 1 && tab <= 3) lists[tab - 1] = null;
+  function resetAllLists(): void {
+    lists[0] = null;
+    lists[1] = null;
+    lists[2] = null;
   }
 
   return {
@@ -121,9 +124,9 @@ export function createDashboard(
       if (activeTab > 0) {
         const isListInput = data === "\x1b[A" || data === "up" || data === "\x1b[B" || data === "down" || data === "\r" || data === " ";
         if (isListInput) {
-          getList(activeTab).handleInput(data);
-          // 设置变更后重建当前列表，确保联动值/语言/币种立即刷新。
-          if (data === "\r" || data === " ") resetList(activeTab);
+          getList(activeTab).handleInput?.(data);
+          // 设置变更后重建所有列表，确保语言/币种/联动值在全部页面立即刷新。
+          if (data === "\r" || data === " ") resetAllLists();
           return true;
         }
       }

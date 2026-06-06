@@ -190,6 +190,11 @@ export interface Translations {
   "value.on": string;
   "value.off": string;
 
+  // ── localized settings list ──
+  "settingsList.empty": string;
+  "settingsList.hint": string;
+  "settingsList.position": string;
+
   // ── alert cards ──
   "alert.softLimit.title": string;
   "alert.softLimit.message": string;
@@ -332,7 +337,7 @@ const en: Translations = {
   "set.budgetSet": "Budget set: {scope} = {amount}",
   "set.budgetCleared": "Budget cleared: {scope}",
   "set.budgetClearedAll": "All budgets cleared",
-  "set.usage": 'Usage:\n  /budget set <amount>\n  /budget set project <amount>\n  /budget set global <amount>',
+  "set.usage": "Usage:\n  /budget set <amount>\n  /budget set project <amount>\n  /budget set global <amount>",
   "set.raisedTo": "Budget raised to {amount}",
   "set.sessionEnded": "Session ended (user terminated)",
   "set.continued": "Continuing, will block again at hard limit",
@@ -386,6 +391,9 @@ const en: Translations = {
   "widget.config.showContextDescription": "Show context window usage (tokens / limit + %).\nPreview: │ 28K/200K (14%)",
   "value.on": "On",
   "value.off": "Off",
+  "settingsList.empty": "No settings available",
+  "settingsList.hint": "↑↓ select · Enter/Space change · ESC exit",
+  "settingsList.position": "{current}/{total}",
 
   "alert.softLimit.title": "⚠️ Soft Limit Reached",
   "alert.softLimit.message": "Used {used} / {budget} ({pct}%)\nYou are approaching your budget limit.",
@@ -574,6 +582,9 @@ const zhCN: Translations = {
   "widget.config.showContextDescription": "打开后 Widget 显示当前会话的上下文使用情况。\n预览：│ 28K/200K (14%)",
   "value.on": "开启",
   "value.off": "关闭",
+  "settingsList.empty": "暂无设置项",
+  "settingsList.hint": "↑↓ 选择 · Enter/Space 修改 · ESC 退出",
+  "settingsList.position": "{current}/{total}",
 
   "alert.softLimit.title": "⚠️ 已达软限",
   "alert.softLimit.message": "已用 {used} / {budget}（{pct}%）\n预算即将用尽。",
@@ -762,6 +773,9 @@ const ja: Translations = {
   "widget.config.showContextDescription": "コンテキストウィンドウの使用状況を表示。\nプレビュー: │ 28K/200K (14%)",
   "value.on": "オン",
   "value.off": "オフ",
+  "settingsList.empty": "設定項目はありません",
+  "settingsList.hint": "↑↓ 選択 · Enter/Space 変更 · ESC 終了",
+  "settingsList.position": "{current}/{total}",
 
   "alert.softLimit.title": "⚠️ ソフトリミット到達",
   "alert.softLimit.message": "使用量 {used} / {budget}（{pct}%）\n予算上限に近づいています。",
@@ -950,6 +964,9 @@ const ko: Translations = {
   "widget.config.showContextDescription": "컨텍스트 창 사용량 표시.\n미리보기: │ 28K/200K (14%)",
   "value.on": "켬",
   "value.off": "끔",
+  "settingsList.empty": "설정 항목 없음",
+  "settingsList.hint": "↑↓ 선택 · Enter/Space 변경 · ESC 종료",
+  "settingsList.position": "{current}/{total}",
 
   "alert.softLimit.title": "⚠️ 소프트 리밋 도달",
   "alert.softLimit.message": "사용량 {used} / {budget} ({pct}%)\n예산 한도에 근접했습니다.",

@@ -2,11 +2,12 @@
  * /budget TUI 设置构建器
  *
  * 主面板使用四个轻量列表：预算、价格表、设置。
- * SettingsList 负责 ↑↓ / Enter 循环值，所有修改立即写入 ~/.pi/budget.json。
+ * 轻量本土化列表负责 ↑↓ / Enter 循环值，所有修改立即写入 ~/.pi/budget.json。
  */
 
 import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent";
-import { SettingsList, type SettingItem, type SettingsListTheme } from "@earendil-works/pi-tui";
+import type { SettingsListTheme } from "@earendil-works/pi-tui";
+import { LocalizedSettingsList, type LocalizedSettingItem } from "../ui/localized-settings-list.js";
 
 import type { BudgetConfig, WidgetConfig } from "../config.js";
 import { DEFAULT_WIDGET_CONFIG, saveConfig } from "../config.js";
@@ -137,7 +138,7 @@ export function createBudgetListForDashboard(
   initialConfig: BudgetConfig,
   model: string | undefined,
   onSave: (config: BudgetConfig) => void,
-): SettingsList {
+): LocalizedSettingsList {
   let current = clone(initialConfig);
   const pricing = getPricingInfo(current, model);
   const presets = budgetPresets(pricing.displayCurrency);
@@ -145,7 +146,7 @@ export function createBudgetListForDashboard(
   const currentBudget = formatBudgetPreset(budget, pricing.displayCurrency);
   const budgetValues = presets.map((v) => formatBudgetPreset(v, pricing.displayCurrency));
 
-  const items: SettingItem[] = [
+  const items: LocalizedSettingItem[] = [
     {
       id: "sessionBudget",
       label: t("budget.sessionBudget"),
@@ -183,7 +184,7 @@ export function createBudgetListForDashboard(
     },
   ];
 
-  return new SettingsList(items, 10, fallbackTheme(), (id, newValue) => {
+  return new LocalizedSettingsList(items, 10, (id, newValue) => {
     const next = clone(current);
     if (id === "sessionBudget") {
       const idx = budgetValues.indexOf(newValue);
@@ -216,11 +217,11 @@ export function createPricingListForDashboard(
   initialConfig: BudgetConfig,
   model: string | undefined,
   onSave: (config: BudgetConfig) => void,
-): SettingsList {
+): LocalizedSettingsList {
   let current = clone(initialConfig);
   const info = getPricingInfo(current, model);
 
-  const items: SettingItem[] = [
+  const items: LocalizedSettingItem[] = [
     { id: "anchor", label: t("pricing.anchor"), description: t("pricing.anchor.description"), currentValue: anchorLabel(info.anchor), values: ANCHOR_KEYS.map(anchorLabel) },
     { id: "model", label: t("pricing.currentModel"), description: t("pricing.currentModel.description"), currentValue: info.model },
     { id: "provider", label: t("pricing.provider"), description: t("pricing.provider.description"), currentValue: info.provider },
@@ -231,7 +232,7 @@ export function createPricingListForDashboard(
     { id: "updatePricing", label: t("pricing.updateToday"), description: t("pricing.updateToday.description"), currentValue: t("pricing.status.latest"), values: [t("pricing.action.update")] },
   ];
 
-  return new SettingsList(items, 12, fallbackTheme(), (id, newValue) => {
+  return new LocalizedSettingsList(items, 12, (id, newValue) => {
     const next = clone(current);
     if (id === "anchor") {
       const key = ANCHOR_KEYS.find((k) => anchorLabel(k) === newValue) ?? "followModel";
@@ -247,13 +248,13 @@ export function createSettingsListForDashboard(
   initialConfig: BudgetConfig,
   model: string | undefined,
   onSave: (config: BudgetConfig) => void,
-): SettingsList {
+): LocalizedSettingsList {
   let current = clone(initialConfig);
   const wc: WidgetConfig = { ...DEFAULT_WIDGET_CONFIG, ...(current.widget ?? {}) };
   const pricing = getPricingInfo(current, model);
   const currentMode = currentModeKey(wc);
 
-  const items: SettingItem[] = [
+  const items: LocalizedSettingItem[] = [
     { id: "locale", label: t("config.locale"), description: t("config.locale.description"), currentValue: localeLabel(current.locale), values: getSupportedLocales().map(localeLabel) },
     { id: "pricingAnchor", label: t("pricing.anchor"), description: t("pricing.anchor.description"), currentValue: anchorLabel(pricing.anchor), values: ANCHOR_KEYS.map(anchorLabel) },
     { id: "mode", label: t("widget.config.mode"), description: `${t("widget.config.livePreview")}:\n  ${previewWidget(wc, pricing.symbol)}\n\n${t("widget.config.modeDescription", { compact: modeLabel(MODE_COMPACT), full: modeLabel(MODE_FULL), custom: modeLabel(MODE_CUSTOM) })}`, currentValue: modeLabel(currentMode), values: MODE_KEYS.map(modeLabel) },
@@ -264,7 +265,7 @@ export function createSettingsListForDashboard(
     { id: "debug", label: t("config.debugLog"), description: t("config.debug.description"), currentValue: boolDisplay(!!current.debug), values: [t("value.on"), t("value.off")] },
   ];
 
-  return new SettingsList(items, 12, fallbackTheme(), (id, newValue) => {
+  return new LocalizedSettingsList(items, 12, (id, newValue) => {
     const next = clone(current);
     const nextWc: WidgetConfig = { ...DEFAULT_WIDGET_CONFIG, ...(next.widget ?? {}) };
     if (id === "locale") {
@@ -290,30 +291,11 @@ export function createSettingsListForDashboard(
   }, () => {});
 }
 
-async function openSettingsPanel(
-  itemsFactory: () => SettingItem[],
-  initialConfig: BudgetConfig,
-  ui: ExtensionUIContext,
-  onSave: (config: BudgetConfig) => void,
-): Promise<BudgetConfig> {
-  const stheme = await getSettingsTheme();
-  return (await ui.custom<BudgetConfig>((_tui, _theme, _kb, done) => {
-    let current = clone(initialConfig);
-    const list = new SettingsList(itemsFactory(), 12, stheme, () => {
-      // 兼容旧命令入口：实际主设置已迁移到 /budget TUI。
-      saveConfig(current);
-      onSave(current);
-    }, () => done(current));
-    return list;
-  })) ?? initialConfig;
-}
-
 export async function openWidgetSettings(
   config: BudgetConfig,
   ui: ExtensionUIContext,
   onSave: (config: BudgetConfig) => void,
 ): Promise<BudgetConfig> {
-  const stheme = await getSettingsTheme();
   let current = clone(config);
   return (await ui.custom<BudgetConfig>((_tui, _theme, _kb, done) => {
     const base = createSettingsListForDashboard(current, undefined, (c) => {
@@ -329,7 +311,6 @@ export async function openWidgetSettings(
       invalidate: () => base.invalidate?.(),
     };
   })) ?? config;
-  void stheme;
 }
 
 export async function openFullSettings(
