@@ -45,63 +45,136 @@ export interface CostBreakdown {
   method: "provider" | "tokens";
 }
 
-export const BUILTIN_PRICE_DATE = "2026-06-06";
-export const BUILTIN_FX_DATE = "2026-06-06";
+export const BUILTIN_PRICE_DATE = "2026-06-07";
+export const BUILTIN_FX_DATE = "2026-06-07";
 
-/** 内置模型价格表（USD / 1M tokens）。后续可扩展为远程拉取。 */
+/** 内置模型价格表（USD / 1M tokens，2026-06-07 更新）。 */
 const BUILTIN_PRICES: Record<string, ModelPrice> = {
-  // ── Anthropic ──
-  "claude-sonnet-4":      { input: 3,    output: 15,   cacheWrite: 3.75, cacheRead: 0.30 },
-  "claude-sonnet-4-5":    { input: 3,    output: 15,   cacheWrite: 3.75, cacheRead: 0.30 },
-  "claude-3-5-sonnet":    { input: 3,    output: 15,   cacheWrite: 3.75, cacheRead: 0.30 },
-  "claude-3-5-haiku":     { input: 0.80, output: 4,    cacheWrite: 1.00, cacheRead: 0.08 },
-  "claude-3-opus":        { input: 15,   output: 75,   cacheWrite: 18.75,cacheRead: 1.50 },
+  // ── Anthropic Claude ──
+  "claude-opus":           { input: 5,    output: 25,   cacheWrite: 6.25, cacheRead: 0.50 },
+  "claude-sonnet":         { input: 3,    output: 15,   cacheWrite: 3.75, cacheRead: 0.30 },
+  "claude-haiku":          { input: 1,    output: 5,    cacheWrite: 1.25, cacheRead: 0.10 },
 
   // ── OpenAI ──
-  "gpt-4o":               { input: 2.50, output: 10,   cacheWrite: 2.50, cacheRead: 0.25 },
-  "gpt-4o-mini":          { input: 0.15, output: 0.60, cacheWrite: 0.15, cacheRead: 0.015 },
-  "gpt-4.1":              { input: 2,    output: 8,    cacheWrite: 2,    cacheRead: 0.20 },
-  "gpt-4.1-mini":         { input: 0.40, output: 1.60, cacheWrite: 0.40, cacheRead: 0.04 },
-  "gpt-4.1-nano":         { input: 0.10, output: 0.40, cacheWrite: 0.10, cacheRead: 0.01 },
-  "o3":                   { input: 10,   output: 40,   cacheWrite: 10,   cacheRead: 1 },
-  "o4-mini":              { input: 1.10, output: 4.40, cacheWrite: 1.10, cacheRead: 0.11 },
+  "gpt-5.5":               { input: 5,    output: 30,   cacheWrite: 5,    cacheRead: 0.50 },
+  "gpt-5.4":               { input: 2.50, output: 15,   cacheWrite: 2.50, cacheRead: 0.25 },
+  "gpt-5.4-mini":          { input: 0.75, output: 4.50, cacheWrite: 0.75, cacheRead: 0.075 },
+  "gpt-4.1":               { input: 2,    output: 8,    cacheWrite: 2,    cacheRead: 0.20 },
+  "gpt-4.1-mini":          { input: 0.40, output: 1.60, cacheWrite: 0.40, cacheRead: 0.04 },
+  "gpt-4.1-nano":          { input: 0.10, output: 0.40, cacheWrite: 0.10, cacheRead: 0.01 },
+  "gpt-4o":                { input: 2.50, output: 10,   cacheWrite: 2.50, cacheRead: 0.25 },
+  "gpt-4o-mini":           { input: 0.15, output: 0.60, cacheWrite: 0.15, cacheRead: 0.015 },
+  "o3":                    { input: 2,    output: 8,    cacheWrite: 2,    cacheRead: 0.20 },
+  "o4-mini":               { input: 1.10, output: 4.40, cacheWrite: 1.10, cacheRead: 0.11 },
 
   // ── Google Gemini ──
-  "gemini-2.5-pro":       { input: 1.25, output: 10,   cacheWrite: 1.25, cacheRead: 0.125 },
-  "gemini-2.5-flash":     { input: 0.15, output: 0.60, cacheWrite: 0.15, cacheRead: 0.015 },
-  "gemini-2.0-flash":     { input: 0.10, output: 0.40, cacheWrite: 0.10, cacheRead: 0.01 },
+  "gemini-3.5-flash":      { input: 1.50, output: 9,    cacheWrite: 1.50, cacheRead: 0.15 },
+  "gemini-3.1-pro":        { input: 2,    output: 12,   cacheWrite: 2,    cacheRead: 0.20 },
+  "gemini-3.1-flash-lite": { input: 0.25, output: 1.50, cacheWrite: 0.25, cacheRead: 0.025 },
+  "gemini-2.5-pro":        { input: 1.25, output: 10,   cacheWrite: 1.25, cacheRead: 0.125 },
+  "gemini-2.5-flash":      { input: 0.30, output: 1.50, cacheWrite: 0.30, cacheRead: 0.03 },
+  "gemini-2.0-flash":      { input: 0.10, output: 0.40, cacheWrite: 0.10, cacheRead: 0.01 },
 
-  // ── DeepSeek (CNY / 1M tokens → 按 1USD≈7.25CNY 转 USD 计价) ──
-  "deepseek-chat":        { input: 0.14, output: 0.28, cacheWrite: 0.14, cacheRead: 0.014 },
-  "deepseek-reasoner":    { input: 0.55, output: 2.20, cacheWrite: 0.55, cacheRead: 0.055 },
+  // ── DeepSeek ──
+  "deepseek-v4-pro":     { input: 0.435, output: 0.87,  cacheWrite: 0.435, cacheRead: 0.0036 },
+  "deepseek-v4-flash":   { input: 0.14,  output: 0.28,  cacheWrite: 0.14,  cacheRead: 0.0028 },
+  "deepseek-chat":       { input: 0.14,  output: 0.28,  cacheWrite: 0.14,  cacheRead: 0.0028 },
+  "deepseek-reasoner":   { input: 0.55,  output: 2.20,  cacheWrite: 0.55,  cacheRead: 0.014 },
 
-  // ── Qwen 通义千问 (CNY → USD) ──
-  "qwen-max":             { input: 0.28, output: 0.84, cacheWrite: 0.28, cacheRead: 0.028 },
-  "qwen-plus":            { input: 0.11, output: 0.28, cacheWrite: 0.11, cacheRead: 0.011 },
-  "qwen-turbo":           { input: 0.04, output: 0.08, cacheWrite: 0.04, cacheRead: 0.004 },
+  // ── Qwen 通义千问 ──
+  "qwen-max":             { input: 1.2,   output: 6,     cacheWrite: 1.2,   cacheRead: 0.12 },
+  "qwen-plus":            { input: 0.4,   output: 2.4,   cacheWrite: 0.4,   cacheRead: 0.04 },
+  "qwen-turbo":           { input: 0.1,   output: 0.4,   cacheWrite: 0.1,   cacheRead: 0.01 },
 
-  // ── Kimi (CNY → USD) ──
-  "kimi":                 { input: 1.66, output: 1.66, cacheWrite: 1.66, cacheRead: 0.166 },
+  // ── Kimi / Moonshot ──
+  "kimi":                 { input: 0.95,  output: 4,     cacheWrite: 0.95,  cacheRead: 0.095 },
 
-  // ── 豆包 (CNY → USD) ──
-  "doubao-pro":           { input: 0.11, output: 0.28, cacheWrite: 0.11, cacheRead: 0.011 },
+  // ── 豆包 / ByteDance ──
+  "doubao":               { input: 0.11,  output: 0.28,  cacheWrite: 0.11,  cacheRead: 0.011 },
 
-  // ── GLM (CNY → USD) ──
-  "glm-4":                { input: 0.014,output: 0.014,cacheWrite: 0.014,cacheRead: 0.0014 },
+  // ── GLM / 智谱 ──
+  "glm":                  { input: 0.014, output: 0.014, cacheWrite: 0.014, cacheRead: 0.0014 },
 
-  // ── MiMo (CNY → USD) ──
-  "mimo":                 { input: 0.14, output: 0.28, cacheWrite: 0.14, cacheRead: 0.014 },
+  // ── MiMo / 小米 ──
+  "mimo":                 { input: 0.14,  output: 0.28,  cacheWrite: 0.14,  cacheRead: 0.014 },
 };
 
-/** 默认价格（未匹配到模型时使用）：约等于中等模型价格 $2/$8 per 1M */
-const DEFAULT_PRICE: ModelPrice = { input: 2, output: 8, cacheWrite: 2, cacheRead: 0.20 };
+/** 默认价格（未匹配到模型时）：约 Claude Sonnet 级别 $3/$15 */
+const DEFAULT_PRICE: ModelPrice = { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.30 };
 
 /** 按模型名模糊匹配价格表，返回 USD 价格。 */
 export function lookupModelPrice(model?: string): ModelPrice {
-  const name = (model ?? "unknown").toLowerCase().replace(/[\s.@\/]/g, "-");
+  const name = (model ?? "unknown").toLowerCase().replace(/[\s._@\/]/g, "-");
+
+  // 1. Claude 家族匹配
+  if (/claude|anthropic/.test(name)) {
+    if (/opus/i.test(name)) return BUILTIN_PRICES["claude-opus"]!;
+    if (/haiku/i.test(name)) return BUILTIN_PRICES["claude-haiku"]!;
+    if (/sonnet/i.test(name)) return BUILTIN_PRICES["claude-sonnet"]!;
+    return BUILTIN_PRICES["claude-sonnet"]!; // default to sonnet pricing
+  }
+
+  // 2. OpenAI 家族匹配
+  if (/openai|gpt|o[0-9]/.test(name)) {
+    if (/gpt-5\.5/.test(name)) return BUILTIN_PRICES["gpt-5.5"]!;
+    if (/gpt-5\.4.*mini/.test(name)) return BUILTIN_PRICES["gpt-5.4-mini"]!;
+    if (/gpt-5\.4/.test(name)) return BUILTIN_PRICES["gpt-5.4"]!;
+    if (/gpt-4\.1.*mini/.test(name)) return BUILTIN_PRICES["gpt-4.1-mini"]!;
+    if (/gpt-4\.1.*nano/.test(name)) return BUILTIN_PRICES["gpt-4.1-nano"]!;
+    if (/gpt-4\.1/.test(name)) return BUILTIN_PRICES["gpt-4.1"]!;
+    if (/gpt-4o.*mini/.test(name)) return BUILTIN_PRICES["gpt-4o-mini"]!;
+    if (/gpt-4o/.test(name)) return BUILTIN_PRICES["gpt-4o"]!;
+    if (/o4.*mini/i.test(name)) return BUILTIN_PRICES["o4-mini"]!;
+    if (/\bo3\b/i.test(name)) return BUILTIN_PRICES["o3"]!;
+    return BUILTIN_PRICES["gpt-4o"]!;
+  }
+
+  // 3. Gemini 家族匹配
+  if (/gemini|google/.test(name)) {
+    if (/gemini-3\.5.*flash/.test(name)) return BUILTIN_PRICES["gemini-3.5-flash"]!;
+    if (/gemini-3\.1.*pro/.test(name)) return BUILTIN_PRICES["gemini-3.1-pro"]!;
+    if (/gemini-3\.1.*flash.*lite/.test(name)) return BUILTIN_PRICES["gemini-3.1-flash-lite"]!;
+    if (/gemini-2\.5.*pro/.test(name)) return BUILTIN_PRICES["gemini-2.5-pro"]!;
+    if (/gemini-2\.5.*flash/.test(name)) return BUILTIN_PRICES["gemini-2.5-flash"]!;
+    if (/gemini-2\.0.*flash/.test(name)) return BUILTIN_PRICES["gemini-2.0-flash"]!;
+    if (/flash.*lite/.test(name)) return BUILTIN_PRICES["gemini-3.1-flash-lite"]!;
+    if (/flash/.test(name)) return BUILTIN_PRICES["gemini-3.5-flash"]!;
+    if (/pro/.test(name)) return BUILTIN_PRICES["gemini-3.1-pro"]!;
+    return BUILTIN_PRICES["gemini-2.5-pro"]!;
+  }
+
+  // 4. DeepSeek 家族匹配
+  if (/deepseek/.test(name)) {
+    if (/v4.*pro|pro/.test(name)) return BUILTIN_PRICES["deepseek-v4-pro"]!;
+    if (/reasoner|r1/i.test(name)) return BUILTIN_PRICES["deepseek-reasoner"]!;
+    return BUILTIN_PRICES["deepseek-v4-flash"]!;
+  }
+
+  // 5. Qwen 家族匹配
+  if (/qwen|通义|tongyi|dashscope/.test(name)) {
+    if (/max/i.test(name)) return BUILTIN_PRICES["qwen-max"]!;
+    if (/plus/i.test(name)) return BUILTIN_PRICES["qwen-plus"]!;
+    if (/turbo/i.test(name)) return BUILTIN_PRICES["qwen-turbo"]!;
+    return BUILTIN_PRICES["qwen-plus"]!;
+  }
+
+  // 6. Kimi / Moonshot
+  if (/kimi|moonshot/.test(name)) return BUILTIN_PRICES["kimi"]!;
+
+  // 7. 豆包 / ByteDance
+  if (/doubao|豆包|volc|火山/.test(name)) return BUILTIN_PRICES["doubao"]!;
+
+  // 8. GLM / 智谱
+  if (/glm|zhipu|智谱/.test(name)) return BUILTIN_PRICES["glm"]!;
+
+  // 9. MiMo / 小米
+  if (/mimo|xiaomi|小米/.test(name)) return BUILTIN_PRICES["mimo"]!;
+
+  // 10. 通用：遍历内置 key 做子串匹配兜底
   for (const [key, price] of Object.entries(BUILTIN_PRICES)) {
     if (name.includes(key)) return price;
   }
+
   return DEFAULT_PRICE;
 }
 
