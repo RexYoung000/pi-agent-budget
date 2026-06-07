@@ -97,6 +97,10 @@ const BUILTIN_PRICES: Record<string, ModelPrice> = {
 
   // ── MiMo / 小米 ──
   "mimo":                 { input: 0.14,  output: 0.28,  cacheWrite: 0.14,  cacheRead: 0.014 },
+
+  // ── MiniMax / 稀宇 ──
+  "minimax-m3":           { input: 0.30,  output: 1.20,  cacheWrite: 0.375, cacheRead: 0.06 },
+  "minimax":              { input: 0.30,  output: 1.20,  cacheWrite: 0.375, cacheRead: 0.06 },
 };
 
 /** 默认价格（未匹配到模型时）：约 Claude Sonnet 级别 $3/$15 */
