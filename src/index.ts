@@ -33,7 +33,7 @@ import {
 import { renderOverview, type OverviewInput } from "./commands/overview.js";
 import { parseRange, parseByDim, runReport, runBy, rangeToSince, type ReportRange } from "./commands/report.js";
 import { openWidgetSettings, openFullSettings, createSettingsListForDashboard, createBudgetListForDashboard, createPricingListForDashboard } from "./commands/config.js";
-import { getPricingInfo, formatMoney, currencyLabel } from "./core/pricing.js";
+import { getPricingInfo, formatMoney, currencyLabel, calculateCostFromTokens, lookupModelPrice } from "./core/pricing.js";
 import { parseExportFormat, runExport as runExportCommand } from "./commands/export.js";
 
 export default function (pi: ExtensionAPI) {
@@ -178,7 +178,19 @@ export default function (pi: ExtensionAPI) {
     const usage = message.usage;
     const costTotal = usage?.cost?.total;
 
-    if (costTotal == null) {
+    // 若是 provider 未返回 cost，按 tokens × 内置价格表兜底计算
+    const fallback = costTotal == null
+      ? calculateCostFromTokens(
+          usage?.input ?? 0,
+          usage?.output ?? 0,
+          usage?.cacheRead ?? 0,
+          usage?.cacheWrite ?? 0,
+          message.model,
+        )
+      : null;
+    const actualTotal = costTotal ?? fallback?.total;
+
+    if (actualTotal == null) {
       console.warn(
         `[pi-budget] ${t("log.costMissing", { model: message.model ?? "?" })}`,
       );
@@ -200,17 +212,17 @@ export default function (pi: ExtensionAPI) {
         cacheRead: usage?.cacheRead ?? 0,
         cacheWrite: usage?.cacheWrite ?? 0,
         cost: {
-          input: usage?.cost?.input ?? 0,
-          output: usage?.cost?.output ?? 0,
-          cacheRead: usage?.cost?.cacheRead ?? 0,
-          cacheWrite: usage?.cost?.cacheWrite ?? 0,
-          total: costTotal,
+          input: fallback?.inputCost ?? usage?.cost?.input ?? 0,
+          output: fallback?.outputCost ?? usage?.cost?.output ?? 0,
+          cacheRead: fallback?.cacheReadCost ?? usage?.cost?.cacheRead ?? 0,
+          cacheWrite: fallback?.cacheWriteCost ?? usage?.cost?.cacheWrite ?? 0,
+          total: actualTotal,
         },
         toolName: lastToolName(message),
       });
 
       lastRequestSnap = {
-        costUsd: costTotal,
+        costUsd: actualTotal,
         inputTokens: usage?.input ?? 0,
         outputTokens: usage?.output ?? 0,
       };
