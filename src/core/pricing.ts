@@ -25,7 +25,7 @@ export interface PricingInfo {
   status: "latest" | "updated";
 }
 
-/** 模型价格（单位：USD / 1M tokens） */
+/** 模型价格（单位：USD 或 CNY / 1M tokens） */
 export interface ModelPrice {
   input: number;
   output: number;
@@ -33,7 +33,12 @@ export interface ModelPrice {
   cacheWrite?: number;
   /** 缓存读取价格（通常 = input 的 10%，绝大多数模型适用） */
   cacheRead?: number;
+  /** 价格货币，默认 USD；CNY 模型标 CNY。 */
+  currency?: "CNY";
 }
+
+/** 内置汇率：1 USD = 7.2 CNY（2026-06 参考） */
+export const USD_TO_CNY = 7.2;
 
 /** 单次请求成本计算结果 */
 export interface CostBreakdown {
@@ -76,27 +81,27 @@ const BUILTIN_PRICES: Record<string, ModelPrice> = {
   "gemini-2.0-flash":      { input: 0.10, output: 0.40, cacheWrite: 0.10, cacheRead: 0.01 },
 
   // ── DeepSeek ──
-  "deepseek-v4-pro":     { input: 0.435, output: 0.87,  cacheWrite: 0.435, cacheRead: 0.0036 },
-  "deepseek-v4-flash":   { input: 0.14,  output: 0.28,  cacheWrite: 0.14,  cacheRead: 0.0028 },
-  "deepseek-chat":       { input: 0.14,  output: 0.28,  cacheWrite: 0.14,  cacheRead: 0.0028 },
-  "deepseek-reasoner":   { input: 0.55,  output: 2.20,  cacheWrite: 0.55,  cacheRead: 0.014 },
+  "deepseek-v4-pro":     { input: 3.13,  output: 6.26,  cacheWrite: 3.13,  cacheRead: 0.026, currency: "CNY" },
+  "deepseek-v4-flash":   { input: 1.0,   output: 2.0,   cacheWrite: 1.0,   cacheRead: 0.02,  currency: "CNY" },
+  "deepseek-chat":       { input: 1.0,   output: 2.0,   cacheWrite: 1.0,   cacheRead: 0.02,  currency: "CNY" },
+  "deepseek-reasoner":   { input: 4.0,   output: 16.0,  cacheWrite: 4.0,   cacheRead: 0.10,  currency: "CNY" },
 
   // ── Qwen 通义千问 ──
-  "qwen-max":             { input: 1.2,   output: 6,     cacheWrite: 1.2,   cacheRead: 0.12 },
-  "qwen-plus":            { input: 0.4,   output: 2.4,   cacheWrite: 0.4,   cacheRead: 0.04 },
-  "qwen-turbo":           { input: 0.1,   output: 0.4,   cacheWrite: 0.1,   cacheRead: 0.01 },
+  "qwen-max":             { input: 8.6,   output: 43.2,  cacheWrite: 8.6,   cacheRead: 0.86,  currency: "CNY" },
+  "qwen-plus":            { input: 2.88,  output: 17.3,  cacheWrite: 2.88,  cacheRead: 0.29,  currency: "CNY" },
+  "qwen-turbo":           { input: 0.72,  output: 2.88,  cacheWrite: 0.72,  cacheRead: 0.072, currency: "CNY" },
 
   // ── Kimi / Moonshot ──
-  "kimi":                 { input: 0.95,  output: 4,     cacheWrite: 0.95,  cacheRead: 0.095 },
+  "kimi":                 { input: 6.84,  output: 28.8,  cacheWrite: 6.84,  cacheRead: 0.68,  currency: "CNY" },
 
   // ── 豆包 / ByteDance ──
-  "doubao":               { input: 0.11,  output: 0.28,  cacheWrite: 0.11,  cacheRead: 0.011 },
+  "doubao":               { input: 0.79,  output: 2.0,   cacheWrite: 0.79,  cacheRead: 0.08,  currency: "CNY" },
 
   // ── GLM / 智谱 ──
-  "glm":                  { input: 0.014, output: 0.014, cacheWrite: 0.014, cacheRead: 0.0014 },
+  "glm":                  { input: 0.10,  output: 0.10,  cacheWrite: 0.10,  cacheRead: 0.01,  currency: "CNY" },
 
   // ── MiMo / 小米 ──
-  "mimo":                 { input: 0.14,  output: 0.28,  cacheWrite: 0.14,  cacheRead: 0.014 },
+  "mimo":                 { input: 1.0,   output: 2.0,   cacheWrite: 1.0,   cacheRead: 0.10,  currency: "CNY" },
 
   // ── MiniMax / 稀宇 ──
   "minimax-m3":           { input: 0.30,  output: 1.20,  cacheWrite: 0.375, cacheRead: 0.06 },
@@ -183,8 +188,9 @@ export function lookupModelPrice(model?: string): ModelPrice {
 }
 
 /**
- * 按 tokens 计算单次请求成本（USD）。
- * 返回完整的费用明细和计算方式（"tokens" 或 "provider"）。
+ * 按 tokens 计算单次请求成本。
+ * - 价格表若标 CNY（中国模型），内部除以汇率转为 USD 存储。
+ * - 返回的 total 始终是 USD，保证数据库跨模型聚合一致。
  */
 export function calculateCostFromTokens(
   inputTokens: number,
@@ -194,17 +200,20 @@ export function calculateCostFromTokens(
   model?: string,
 ): CostBreakdown {
   const price = lookupModelPrice(model);
+  const isCny = price.currency === "CNY";
   const ONE_M = 1_000_000;
   const inputCost = (inputTokens / ONE_M) * price.input;
   const outputCost = (outputTokens / ONE_M) * price.output;
   const cacheWriteCost = (cacheWrite / ONE_M) * (price.cacheWrite ?? price.input);
   const cacheReadCost = (cacheRead / ONE_M) * (price.cacheRead ?? price.input * 0.1);
+  const rawTotal = inputCost + outputCost + cacheWriteCost + cacheReadCost;
+  const total = isCny ? rawTotal / USD_TO_CNY : rawTotal;
   return {
-    inputCost,
-    outputCost,
-    cacheReadCost,
-    cacheWriteCost,
-    total: inputCost + outputCost + cacheWriteCost + cacheReadCost,
+    inputCost: isCny ? inputCost / USD_TO_CNY : inputCost,
+    outputCost: isCny ? outputCost / USD_TO_CNY : outputCost,
+    cacheReadCost: isCny ? cacheReadCost / USD_TO_CNY : cacheReadCost,
+    cacheWriteCost: isCny ? cacheWriteCost / USD_TO_CNY : cacheWriteCost,
+    total,
     method: "tokens",
   };
 };
@@ -301,8 +310,21 @@ export function formatMoney(amount: number, currency: CurrencyCode): string {
   return `${currencySymbol(currency)}${amount.toFixed(2)}`;
 }
 
-export function budgetPresets(currency: CurrencyCode): number[] {
-  return currency === "CNY" ? [0, 5, 10, 20, 50] : [0, 1, 2, 5, 10];
+/** 把内部 USD 值转为显示货币。 */
+export function usdToDisplay(usd: number, currency: CurrencyCode): number {
+  if (currency === "CNY") return usd * USD_TO_CNY;
+  return usd;
+}
+
+/** 格式化 USD 值，自动转为显示货币后输出。 */
+export function formatUsdInCurrency(usd: number, currency: CurrencyCode): string {
+  return formatMoney(usdToDisplay(usd, currency), currency);
+}
+
+export function budgetPresets(anchor: PricingAnchor): number[] {
+  // 只有用户明确选择 CNY 锚点时，预设才用人民币金额。
+  // followModel 模式下模型可能被识别为 CNY 但预算仍用 USD。
+  return anchor === "cny" ? [0, 5, 10, 20, 50] : [0, 1, 2, 5, 10];
 }
 
 export function formatBudgetPreset(amount: number, currency: CurrencyCode): string {

@@ -141,10 +141,12 @@ export function createBudgetListForDashboard(
 ): LocalizedSettingsList {
   let current = clone(initialConfig);
   const pricing = getPricingInfo(current, model);
-  const presets = budgetPresets(pricing.displayCurrency);
+  // 预算金额始终跟随锚点货币（followModel 时仍为 USD）
+  const budgetCurrency = pricing.anchor === "cny" ? "CNY" : "USD";
+  const presets = budgetPresets(pricing.anchor);
   const budget = current.session?.usd ?? 0;
-  const currentBudget = formatBudgetPreset(budget, pricing.displayCurrency);
-  const budgetValues = presets.map((v) => formatBudgetPreset(v, pricing.displayCurrency));
+  const currentBudget = formatBudgetPreset(budget, budgetCurrency);
+  const budgetValues = presets.map((v) => formatBudgetPreset(v, budgetCurrency));
 
   const items: LocalizedSettingItem[] = [
     {

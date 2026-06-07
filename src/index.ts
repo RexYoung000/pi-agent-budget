@@ -33,7 +33,7 @@ import {
 import { renderOverview, type OverviewInput } from "./commands/overview.js";
 import { parseRange, parseByDim, runReport, runBy, rangeToSince, type ReportRange } from "./commands/report.js";
 import { openWidgetSettings, openFullSettings, createSettingsListForDashboard, createBudgetListForDashboard, createPricingListForDashboard } from "./commands/config.js";
-import { getPricingInfo, formatMoney, currencyLabel, calculateCostFromTokens, lookupModelPrice } from "./core/pricing.js";
+import { getPricingInfo, formatMoney, usdToDisplay, formatUsdInCurrency, currencyLabel, calculateCostFromTokens, lookupModelPrice } from "./core/pricing.js";
 import { parseExportFormat, runExport as runExportCommand } from "./commands/export.js";
 
 export default function (pi: ExtensionAPI) {
@@ -113,8 +113,8 @@ export default function (pi: ExtensionAPI) {
     const pricing = getPricingInfo(config, modelDisplay);
     const state: WidgetState = {
       model: modelDisplay,
-      usedUsd,
-      budgetUsd: config.session?.usd ?? 0,
+      usedUsd: usdToDisplay(usedUsd, pricing.displayCurrency),
+      budgetUsd: usdToDisplay(config.session?.usd ?? 0, pricing.displayCurrency),
       currencySymbol: pricing.symbol,
       context: context ? { tokens: context.tokens, contextWindow: context.contextWindow, percent: context.percent } : undefined,
     };
@@ -424,12 +424,12 @@ export default function (pi: ExtensionAPI) {
 
     const overviewText = () => {
       const lines: string[] = [];
-      lines.push(`${t("overview.sessionCost")}: ${formatMoney(usedUsd, pricing.displayCurrency)}${budgetUsd && budgetUsd > 0 ? ` / ${formatMoney(budgetUsd, pricing.displayCurrency)}` : ` (${t("overview.noBudget")})`}`);
+      lines.push(`${t("overview.sessionCost")}: ${formatUsdInCurrency(usedUsd, pricing.displayCurrency)}${budgetUsd && budgetUsd > 0 ? ` / ${formatUsdInCurrency(budgetUsd, pricing.displayCurrency)}` : ` (${t("overview.noBudget")})`}`);
       lines.push(`${t("overview.model")}: ${modelName || t("report.unknown")}`);
       lines.push(`${t("pricing.nativeCurrency")}: ${currencyLabel(pricing.nativeCurrency)}`);
       lines.push(`${t("overview.sessionContext")}: ${sessionId}`);
       if (lastRequestSnap) {
-        lines.push(`${t("overview.last")}: ${formatMoney(lastRequestSnap.costUsd, pricing.displayCurrency)} (${t("overview.inputTokens", { count: lastRequestSnap.inputTokens })} / ${t("overview.outputTokens", { count: lastRequestSnap.outputTokens })})`);
+        lines.push(`${t("overview.last")}: ${formatUsdInCurrency(lastRequestSnap.costUsd, pricing.displayCurrency)} (${t("overview.inputTokens", { count: lastRequestSnap.inputTokens })} / ${t("overview.outputTokens", { count: lastRequestSnap.outputTokens })})`);
       }
       if (context) {
         const tokens = context.tokens ?? 0;
