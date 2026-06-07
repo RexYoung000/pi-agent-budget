@@ -177,9 +177,10 @@ export default function (pi: ExtensionAPI) {
 
     const usage = message.usage;
     const costTotal = usage?.cost?.total;
+    const providerHasCost = costTotal != null && costTotal > 0;
 
-    // 若是 provider 未返回 cost，按 tokens × 内置价格表兜底计算
-    const fallback = costTotal == null
+    // 若 provider 未返回 cost 或 cost=0，按 tokens × 内置价格表兜底计算
+    const fallback = !providerHasCost
       ? calculateCostFromTokens(
           usage?.input ?? 0,
           usage?.output ?? 0,
@@ -188,9 +189,9 @@ export default function (pi: ExtensionAPI) {
           message.model,
         )
       : null;
-    const actualTotal = costTotal ?? fallback?.total;
+    const actualTotal = providerHasCost ? costTotal! : (fallback?.total ?? 0);
 
-    if (actualTotal == null) {
+    if (actualTotal <= 0 && (usage?.input ?? 0) + (usage?.output ?? 0) === 0) {
       console.warn(
         `[pi-budget] ${t("log.costMissing", { model: message.model ?? "?" })}`,
       );
