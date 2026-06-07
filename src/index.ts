@@ -41,6 +41,7 @@ export default function (pi: ExtensionAPI) {
   // 共享状态
   // ────────────────────────────────────────────────────────────────────────
   let dbPromise: Promise<BudgetDb> | null = null;
+  let trackerPromise: Promise<ReturnType<typeof createTracker>> | null = null;
   const projectIdCache = new Map<string, string>();
   let config: BudgetConfig = loadConfig();
 
@@ -59,9 +60,17 @@ export default function (pi: ExtensionAPI) {
       dbPromise = BudgetDb.open();
       dbPromise.catch(() => {
         dbPromise = null;
+        trackerPromise = null;
       });
     }
     return dbPromise;
+  }
+
+  async function getTracker(): Promise<ReturnType<typeof createTracker>> {
+    if (!trackerPromise) {
+      trackerPromise = getDb().then((db) => createTracker(db));
+    }
+    return trackerPromise;
   }
 
   function getProjectIdForCwd(cwd: string): string {
@@ -200,7 +209,7 @@ export default function (pi: ExtensionAPI) {
 
     try {
       const db = await getDb();
-      const tracker = createTracker(db);
+      const tracker = await getTracker();
       const sessionId = getSessionId(ctx);
       const projectId = getProjectIdForCwd(ctx.cwd);
 
@@ -253,8 +262,8 @@ export default function (pi: ExtensionAPI) {
 
       let usedUsd = 0;
       try {
-        const db = await getDb();
-        usedUsd = createTracker(db).refreshSession(sessionId);
+        const tracker = await getTracker();
+        usedUsd = tracker.refreshSession(sessionId);
       } catch {
         // ignore
       }
@@ -273,8 +282,8 @@ export default function (pi: ExtensionAPI) {
       const sessionId = getSessionId(ctx);
       let usedUsd = 0;
       try {
-        const db = await getDb();
-        usedUsd = createTracker(db).sessionUsd(sessionId);
+        const tracker = await getTracker();
+        usedUsd = tracker.sessionUsd(sessionId);
       } catch {
         // ignore
       }
@@ -301,6 +310,7 @@ export default function (pi: ExtensionAPI) {
       // ignore
     }
     dbPromise = null;
+    trackerPromise = null;
   });
 
   // ────────────────────────────────────────────────────────────────────────
@@ -316,8 +326,8 @@ export default function (pi: ExtensionAPI) {
 
     let usedUsd = 0;
     try {
-      const db = await getDb();
-      usedUsd = createTracker(db).sessionUsd(sessionId);
+      const tracker = await getTracker();
+      usedUsd = tracker.sessionUsd(sessionId);
     } catch {
       // db 拿不到，宁可放行也不要错拦
       return { action: "continue" as const };
@@ -402,8 +412,8 @@ export default function (pi: ExtensionAPI) {
     const sessionId = getSessionId(ctx);
     let usedUsd = 0;
     try {
-      const db = await getDb();
-      usedUsd = createTracker(db).sessionUsd(sessionId);
+      const tracker = await getTracker();
+      usedUsd = tracker.sessionUsd(sessionId);
     } catch { /* ignore */ }
 
     const modelName = ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay;
@@ -474,8 +484,8 @@ export default function (pi: ExtensionAPI) {
     if (uiRef) {
       let usedUsd = 0;
       try {
-        const db = await getDb();
-        usedUsd = createTracker(db).sessionUsd(sessionId);
+        const tracker = await getTracker();
+        usedUsd = tracker.sessionUsd(sessionId);
       } catch {
         // ignore
       }
@@ -491,8 +501,8 @@ export default function (pi: ExtensionAPI) {
       const sessionId = getSessionId(ctx);
       let usedUsd = 0;
       try {
-        const db = await getDb();
-        usedUsd = createTracker(db).sessionUsd(sessionId);
+        const tracker = await getTracker();
+        usedUsd = tracker.sessionUsd(sessionId);
       } catch {
         // ignore
       }
@@ -564,7 +574,7 @@ export default function (pi: ExtensionAPI) {
     const sessionId = getSessionId(ctx);
     let usedUsd = 0;
     try {
-      getDb().then((db) => { usedUsd = createTracker(db).sessionUsd(sessionId); refreshWidget(uiRef!, ctx, usedUsd); });
+      getTracker().then((tracker) => { usedUsd = tracker.sessionUsd(sessionId); refreshWidget(uiRef!, ctx, usedUsd); });
     } catch { /* ignore */ }
   }
 
