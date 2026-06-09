@@ -30,10 +30,10 @@ function hardOptions(): Array<{ label: string; value: HardLimitAction }> {
   ];
 }
 
-function formatTitle(prefix: string, status: LimitStatus): string {
+function formatTitle(prefix: string, status: LimitStatus, symbol: string = "$"): string {
   const pct = Math.round(status.ratio * 100);
-  const usedStr = `$${status.current.toFixed(2)}`;
-  const budgetStr = `$${status.budget.toFixed(2)}`;
+  const usedStr = `${symbol}${status.current.toFixed(2)}`;
+  const budgetStr = `${symbol}${status.budget.toFixed(2)}`;
   return `${prefix} — ${usedStr} / ${budgetStr} (${pct}%)`;
 }
 
@@ -41,8 +41,9 @@ function formatTitle(prefix: string, status: LimitStatus): string {
 export async function showSoftLimitCard(
   ui: Pick<ExtensionUIContext, "select">,
   status: LimitStatus,
+  symbol?: string,
 ): Promise<SoftLimitAction> {
-  const title = formatTitle(t("alert.softLimit.title"), status);
+  const title = formatTitle(t("alert.softLimit.title"), status, symbol);
   const options = softOptions();
   const labels = options.map((o) => o.label);
   const choice = await ui.select(title, labels);
@@ -54,8 +55,9 @@ export async function showSoftLimitCard(
 export async function showHardLimitCard(
   ui: Pick<ExtensionUIContext, "select">,
   status: LimitStatus,
+  symbol?: string,
 ): Promise<HardLimitAction> {
-  const title = formatTitle(t("alert.hardLimit.title"), status);
+  const title = formatTitle(t("alert.hardLimit.title"), status, symbol);
   const options = hardOptions();
   const labels = options.map((o) => o.label);
   const choice = await ui.select(title, labels);
@@ -69,9 +71,11 @@ export async function showHardLimitCard(
 export async function askNewBudget(
   ui: Pick<ExtensionUIContext, "input">,
   current?: number,
+  symbol?: string,
 ): Promise<number | undefined> {
+  const sym = symbol ?? "$";
   const placeholder = current
-    ? t("alert.newBudget.message") + ` (${t("set.scope.session")} $${current.toFixed(2)})`
+    ? t("alert.newBudget.message") + ` (${t("set.scope.session")} ${sym}${current.toFixed(2)})`
     : t("alert.newBudget.message");
   const raw = await ui.input(t("alert.newBudget.title"), placeholder);
   if (raw == null) return undefined;

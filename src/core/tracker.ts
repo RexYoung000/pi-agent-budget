@@ -15,6 +15,9 @@ export interface Tracker {
   /** 本会话已花费 USD（走内存缓存，避免每条都查 SQL）。 */
   sessionUsd(sessionId: string): number;
 
+  /** 本会话当前模型已花费 USD（按模型切分，切换模型后独立计数）。 */
+  sessionModelUsd(sessionId: string, model: string): number;
+
   /** 让缓存立即与 DB 对齐（例如 widget 刷新前调用）。 */
   refreshSession(sessionId: string): number;
 
@@ -44,7 +47,13 @@ export function lastToolName(message: { content?: unknown }): string | undefined
 export function createTracker(db: BudgetDb): Tracker {
   // session 级 USD 内存缓存，避免每条 cost 都查 SUM
   const sessionCache = new Map<string, number>();
+  // session + model 级 USD 缓存（按模型切分）
+  const sessionModelCache = new Map<string, number>();
   let widgetRefresher: ((sessionId: string) => void) | null = null;
+
+  function modelCacheKey(sessionId: string, model: string): string {
+    return `${sessionId}::${model}`;
+  }
 
   return {
     record(rec) {
@@ -63,9 +72,16 @@ export function createTracker(db: BudgetDb): Tracker {
         taskId: rec.taskId,
       };
       db.insertCost(full);
+      // 更新 session 级缓存
       sessionCache.set(
         full.sessionId,
         (sessionCache.get(full.sessionId) ?? 0) + full.cost.total,
+      );
+      // 更新 session+model 级缓存
+      const key = modelCacheKey(full.sessionId, full.model);
+      sessionModelCache.set(
+        key,
+        (sessionModelCache.get(key) ?? 0) + full.cost.total,
       );
     },
 
@@ -73,6 +89,14 @@ export function createTracker(db: BudgetDb): Tracker {
       if (sessionCache.has(sessionId)) return sessionCache.get(sessionId)!;
       const sum = db.sumSessionUsd(sessionId);
       sessionCache.set(sessionId, sum);
+      return sum;
+    },
+
+    sessionModelUsd(sessionId, model) {
+      const key = modelCacheKey(sessionId, model);
+      if (sessionModelCache.has(key)) return sessionModelCache.get(key)!;
+      const sum = db.sumSessionModelUsd(sessionId, model);
+      sessionModelCache.set(key, sum);
       return sum;
     },
 

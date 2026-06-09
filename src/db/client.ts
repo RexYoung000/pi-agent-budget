@@ -139,6 +139,16 @@ export class BudgetDb {
     return row?.total ?? 0;
   }
 
+  /** 按 session + model 累计 USD（当前模型在当前会话的消耗）。 */
+  sumSessionModelUsd(sessionId: string, model: string): number {
+    const row = this.db
+      .prepare<[string, string], { total: number | null }>(
+        "SELECT COALESCE(SUM(cost_total), 0) AS total FROM costs WHERE session_id = ? AND model = ?",
+      )
+      .get(sessionId, model);
+    return row?.total ?? 0;
+  }
+
   /** 按 project + 时间窗口累计。since = 0 表示不限制。 */
   sumProjectUsd(projectId: string, since: number = 0): number {
     const row = this.db

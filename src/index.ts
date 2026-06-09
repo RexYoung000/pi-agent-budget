@@ -21,7 +21,7 @@ import { loadConfig, saveConfig, type BudgetConfig, DEFAULT_WIDGET_CONFIG } from
 import { initLocale, t, setLocale } from "./i18n/index.js";
 import { createWidgetRenderer, type WidgetState } from "./ui/widget.js";
 import { createDashboard } from "./ui/dashboard.js";
-import { checkSessionLimit } from "./core/limits.js";
+import { checkSessionLimit, type LimitStatus } from "./core/limits.js";
 import { showSoftLimitCard, showHardLimitCard, askNewBudget } from "./ui/alert-card.js";
 import {
   parseSetArgs,
@@ -33,7 +33,7 @@ import {
 import { renderOverview, type OverviewInput } from "./commands/overview.js";
 import { parseRange, parseByDim, runReport, runBy, rangeToSince, type ReportRange } from "./commands/report.js";
 import { openWidgetSettings, openFullSettings, createSettingsListForDashboard, createBudgetListForDashboard, createPricingListForDashboard } from "./commands/config.js";
-import { getPricingInfo, formatMoney, usdToDisplay, formatUsdInCurrency, currencyLabel, calculateCostFromTokens, lookupModelPrice } from "./core/pricing.js";
+import { getPricingInfo, formatMoney, usdToDisplay, formatUsdInCurrency, currencyLabel, calculateCostFromTokens, lookupModelPrice, USD_TO_CNY } from "./core/pricing.js";
 import { parseExportFormat, runExport as runExportCommand } from "./commands/export.js";
 
 export default function (pi: ExtensionAPI) {
@@ -128,6 +128,7 @@ export default function (pi: ExtensionAPI) {
     ui: Pick<ExtensionUIContext, "select" | "input" | "notify">,
     sessionId: string,
     usedUsd: number,
+    modelName?: string,
   ): Promise<void> {
     const budget = config.session?.usd ?? 0;
     const status = checkSessionLimit(usedUsd, budget, config);
@@ -141,14 +142,26 @@ export default function (pi: ExtensionAPI) {
     if (softLimitAlreadyShown.has(key)) return;
     softLimitAlreadyShown.add(key);
 
+    // 按当前模型的币种换算显示金额
+    const pricing = getPricingInfo(config, modelName);
+    const displayStatus: LimitStatus = {
+      ...status,
+      current: usdToDisplay(status.current, pricing.displayCurrency),
+      budget: usdToDisplay(status.budget, pricing.displayCurrency),
+      threshold: usdToDisplay(status.threshold, pricing.displayCurrency),
+    };
+
     try {
-      const action = await showSoftLimitCard(ui, status);
+      const action = await showSoftLimitCard(ui, displayStatus, pricing.symbol);
       if (action === "raise") {
-        const newAmount = await askNewBudget(ui, budget);
+        const displayBudget = usdToDisplay(budget, pricing.displayCurrency);
+        const newAmount = await askNewBudget(ui, displayBudget, pricing.symbol);
         if (newAmount && newAmount > 0) {
-          config = applySet({ scope: "session", amount: newAmount }, config);
+          // 用户在弹窗输入的是显示币种金额，转回 USD 存储
+          const usdAmount = pricing.displayCurrency === "CNY" ? newAmount / USD_TO_CNY : newAmount;
+          config = applySet({ scope: "session", amount: usdAmount }, config);
           softLimitAlreadyShown.delete(key);
-          ui.notify(t("set.raisedTo", { amount: fmtUsd(newAmount) }), "info");
+          ui.notify(t("set.raisedTo", { amount: formatMoney(newAmount, pricing.displayCurrency) }), "info");
         }
       } else if (action === "abort") {
         ui.notify(t("set.sessionEnded"), "warning");
@@ -237,14 +250,16 @@ export default function (pi: ExtensionAPI) {
         outputTokens: usage?.output ?? 0,
       };
 
-      const usedUsd = tracker.sessionUsd(sessionId);
+      // 当前模型消耗（不是全会话总计），切换模型后独立计数
+      const modelName = message.model ?? currentModelDisplay;
+      const usedModelUsd = modelName ? tracker.sessionModelUsd(sessionId, modelName) : tracker.sessionUsd(sessionId);
 
-      if (uiRef) refreshWidget(uiRef, ctx, usedUsd);
+      if (uiRef) refreshWidget(uiRef, ctx, usedModelUsd);
 
       // 软限检查（不阻塞主流程，独立 catch）
       if (uiRef) {
         const uiForCard: Pick<ExtensionUIContext, "select" | "input" | "notify"> = ctx.ui;
-        maybeShowSoftLimit(uiForCard, sessionId, usedUsd).catch(() => {});
+        maybeShowSoftLimit(uiForCard, sessionId, usedModelUsd, modelName).catch(() => {});
       }
     } catch (err) {
       console.warn(`[pi-budget] ${t("log.messageEndError")}: ${(err as Error).message}`);
@@ -280,15 +295,17 @@ export default function (pi: ExtensionAPI) {
     try {
       if (!uiRef) uiRef = ctx.ui;
       const sessionId = getSessionId(ctx);
-      let usedUsd = 0;
+      const newModel = event.model?.name ?? event.model?.id ?? currentModelDisplay;
+      currentModelDisplay = newModel;
+      // 切换模型后，只显示新模型的消耗
+      let usedModelUsd = 0;
       try {
         const tracker = await getTracker();
-        usedUsd = tracker.sessionUsd(sessionId);
+        usedModelUsd = tracker.sessionModelUsd(sessionId, newModel);
       } catch {
         // ignore
       }
-      currentModelDisplay = event.model?.name ?? event.model?.id ?? currentModelDisplay;
-      refreshWidget(uiRef, ctx, usedUsd);
+      refreshWidget(uiRef, ctx, usedModelUsd);
     } catch (err) {
       console.warn(`[pi-budget] ${t("log.modelSelectError")}: ${(err as Error).message}`);
     }
@@ -324,10 +341,12 @@ export default function (pi: ExtensionAPI) {
     const budget = config.session?.usd ?? 0;
     if (!budget || budget <= 0) return { action: "continue" as const };
 
+    // 按当前模型消耗做硬限检查（切换模型后独立计数）
+    const modelName = ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay;
     let usedUsd = 0;
     try {
       const tracker = await getTracker();
-      usedUsd = tracker.sessionUsd(sessionId);
+      usedUsd = modelName ? tracker.sessionModelUsd(sessionId, modelName) : tracker.sessionUsd(sessionId);
     } catch {
       // db 拿不到，宁可放行也不要错拦
       return { action: "continue" as const };
@@ -336,14 +355,24 @@ export default function (pi: ExtensionAPI) {
     const status = checkSessionLimit(usedUsd, budget, config);
     if (!status || status.level !== "hard") return { action: "continue" as const };
 
-    // 已硬限 → 弹窗阻塞
+    // 已硬限 → 弹窗阻塞（按当前模型币种换算显示）
     try {
-      const action = await showHardLimitCard(ctx.ui, status);
+      const pricing = getPricingInfo(config, modelName);
+      const displayStatus: LimitStatus = {
+        ...status,
+        current: usdToDisplay(status.current, pricing.displayCurrency),
+        budget: usdToDisplay(status.budget, pricing.displayCurrency),
+        threshold: usdToDisplay(status.threshold, pricing.displayCurrency),
+      };
+      const action = await showHardLimitCard(ctx.ui, displayStatus, pricing.symbol);
       if (action === "raise_and_continue") {
-        const newAmount = await askNewBudget(ctx.ui, budget);
+        const displayBudget = usdToDisplay(budget, pricing.displayCurrency);
+        const newAmount = await askNewBudget(ctx.ui, displayBudget, pricing.symbol);
         if (newAmount && newAmount > 0) {
-          config = applySet({ scope: "session", amount: newAmount }, config);
-          ctx.ui.notify(t("set.raisedTo", { amount: fmtUsd(newAmount) }) + ", " + t("set.continued"), "info");
+          // 用户在弹窗输入的是显示币种金额，转回 USD 存储
+          const usdAmount = pricing.displayCurrency === "CNY" ? newAmount / USD_TO_CNY : newAmount;
+          config = applySet({ scope: "session", amount: usdAmount }, config);
+          ctx.ui.notify(t("set.raisedTo", { amount: formatMoney(newAmount, pricing.displayCurrency) }) + ", " + t("set.continued"), "info");
           return { action: "continue" as const };
         }
         // 用户取消调高 → 视为拒绝
@@ -410,13 +439,14 @@ export default function (pi: ExtensionAPI) {
 
   async function runOverviewCommand(ctx: ExtensionCommandContext): Promise<void> {
     const sessionId = getSessionId(ctx);
+    const modelName = ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay;
     let usedUsd = 0;
     try {
       const tracker = await getTracker();
-      usedUsd = tracker.sessionUsd(sessionId);
+      // 按当前模型消耗（切换模型后独立计数）
+      usedUsd = modelName ? tracker.sessionModelUsd(sessionId, modelName) : tracker.sessionUsd(sessionId);
     } catch { /* ignore */ }
 
-    const modelName = ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay;
     const pricing = getPricingInfo(config, modelName);
     const budgetUsd = config.session?.usd;
     const status = checkSessionLimit(usedUsd, budgetUsd ?? 0, config);
@@ -480,16 +510,17 @@ export default function (pi: ExtensionAPI) {
     for (const k of [...softLimitAlreadyShown]) {
       if (k.startsWith(`${sessionId}:`)) softLimitAlreadyShown.delete(k);
     }
-    // 立刻刷新 widget
+    // 立刻刷新 widget（按当前模型消耗）
     if (uiRef) {
-      let usedUsd = 0;
+      const modelName = ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay;
+      let usedModelUsd = 0;
       try {
         const tracker = await getTracker();
-        usedUsd = tracker.sessionUsd(sessionId);
+        usedModelUsd = modelName ? tracker.sessionModelUsd(sessionId, modelName) : tracker.sessionUsd(sessionId);
       } catch {
         // ignore
       }
-      refreshWidget(uiRef, ctx, usedUsd);
+      refreshWidget(uiRef, ctx, usedModelUsd);
     }
     ctx.ui.notify(t("set.budgetSet", { scope: parsed.scope, amount: fmtUsd(parsed.amount) }), "info");
   }
@@ -499,14 +530,15 @@ export default function (pi: ExtensionAPI) {
     config = applyUnset(scope, config);
     if (uiRef) {
       const sessionId = getSessionId(ctx);
-      let usedUsd = 0;
+      const modelName = ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay;
+      let usedModelUsd = 0;
       try {
         const tracker = await getTracker();
-        usedUsd = tracker.sessionUsd(sessionId);
+        usedModelUsd = modelName ? tracker.sessionModelUsd(sessionId, modelName) : tracker.sessionUsd(sessionId);
       } catch {
         // ignore
       }
-      refreshWidget(uiRef, ctx, usedUsd);
+      refreshWidget(uiRef, ctx, usedModelUsd);
     }
     const scopeLabel = scope === "all" ? t("set.budgetClearedAll") : t("set.budgetCleared", { scope });
     ctx.ui.notify(scopeLabel, "info");
@@ -572,9 +604,12 @@ export default function (pi: ExtensionAPI) {
     if (config.locale) setLocale(config.locale);
     if (!uiRef) return;
     const sessionId = getSessionId(ctx);
-    let usedUsd = 0;
+    const modelName = ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay;
     try {
-      getTracker().then((tracker) => { usedUsd = tracker.sessionUsd(sessionId); refreshWidget(uiRef!, ctx, usedUsd); });
+      getTracker().then((tracker) => {
+        const usedModelUsd = modelName ? tracker.sessionModelUsd(sessionId, modelName) : tracker.sessionUsd(sessionId);
+        refreshWidget(uiRef!, ctx, usedModelUsd);
+      });
     } catch { /* ignore */ }
   }
 
