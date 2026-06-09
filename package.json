@@ -1,6 +1,6 @@
 {
   "name": "pi-agent-budget",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Pi extension: AI coding cost tracker with widget, budget limits, and CNY pricing for Chinese models.",
   "type": "module",
   "main": "./src/index.ts",
@@ -19,13 +19,15 @@
   "license": "MIT",
   "keywords": [
     "pi-package",
-    "pi",
     "pi-extension",
     "ai",
     "cost",
     "budget",
+    "cost-tracker",
+    "token-tracker",
     "observability",
-    "cny"
+    "cny",
+    "widget"
   ],
   "scripts": {
     "check": "tsc --noEmit"
