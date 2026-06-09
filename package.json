@@ -1,6 +1,6 @@
 {
   "name": "pi-agent-budget",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Pi extension: AI coding cost tracker with widget, budget limits, and CNY pricing for Chinese models.",
   "type": "module",
   "main": "./src/index.ts",
@@ -36,7 +36,7 @@
     "extensions": [
       "./src/index.ts"
     ],
-    "image": "https://raw.githubusercontent.com/RexYoung000/pi-packages-manager/main/previews/pi-agent-budget.png"
+    "image": "https://raw.githubusercontent.com/RexYoung000/pi-agent-budget/main/preview.png"
   },
   "dependencies": {
     "better-sqlite3": "^11.5.0"
