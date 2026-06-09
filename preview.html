@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=800,height=500">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 800px; height: 500px;
+    background: #0d1117;
+    font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+    color: #c9d1d9;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .header {
+    background: #161b22; border-bottom: 1px solid #30363d;
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px;
+  }
+  .header .title { color: #58a6ff; font-weight: bold; }
+  .header .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .header .dot.green { background: #3fb950; }
+  .panel {
+    padding: 12px 16px;
+    border-bottom: 1px solid #21262d;
+    font-size: 13px;
+  }
+  .widget {
+    background: #161b22; border: 1px solid #30363d;
+    border-radius: 6px; padding: 8px 14px;
+    display: flex; align-items: center; gap: 12px;
+    margin: 0 16px;
+    font-size: 12px;
+  }
+  .widget .model { color: #58a6ff; }
+  .widget .cost { color: #f0f6fc; font-weight: bold; font-size: 14px; }
+  .widget .budget { color: #8b949e; }
+  .widget .bar {
+    flex: 1; height: 4px; background: #21262d;
+    border-radius: 2px; overflow: hidden;
+  }
+  .widget .bar-fill {
+    height: 100%; width: 16%;
+    background: linear-gradient(90deg, #3fb950, #d29922);
+    border-radius: 2px;
+  }
+  .widget .pct { color: #8b949e; font-size: 11px; }
+  .dashboard {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 12px; padding: 14px 16px;
+    flex: 1;
+  }
+  .card {
+    background: #161b22; border: 1px solid #30363d;
+    border-radius: 6px; padding: 12px 14px;
+  }
+  .card .label { font-size: 10px; color: #8b949e; text-transform: uppercase; margin-bottom: 6px; }
+  .card .value { font-size: 22px; font-weight: bold; }
+  .card .value.green { color: #3fb950; }
+  .card .value.orange { color: #d29922; }
+  .card .value.blue { color: #58a6ff; }
+  .card .detail { font-size: 11px; color: #8b949e; margin-top: 4px; }
+  .model-row {
+    display: flex; justify-content: space-between;
+    padding: 4px 0; font-size: 11px;
+    border-bottom: 1px solid #21262d;
+  }
+  .model-row .name { color: #58a6ff; }
+  .model-row .amt { color: #c9d1d9; }
+  .alert {
+    background: #2a1a0a; border: 1px solid #d29922;
+    border-radius: 4px; padding: 8px 12px;
+    font-size: 11px; color: #d29922;
+    margin: 0 16px 8px;
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <span class="dot green"></span>
+  <span class="title">pi-agent-budget</span>
+  <span style="color:#8b949e">v0.1.2</span>
+  <span style="color:#484f58;margin-left:auto">/budget 查看面板</span>
+</div>
+
+<div class="alert">⚠️ 软限制提醒：已使用 80% 的预算（¥16.00 / ¥20.00）</div>
+
+<div class="widget">
+  <span class="model">🟣 deepseek-v3</span>
+  <span class="cost">¥1.28</span>
+  <span class="budget">/ ¥20.00</span>
+  <div class="bar"><div class="bar-fill"></div></div>
+  <span class="pct">16%</span>
+</div>
+
+<div class="dashboard">
+  <div class="card">
+    <div class="label">本次会话</div>
+    <div class="value orange">¥3.16</div>
+    <div class="detail">4,832 tokens · 3 条消息</div>
+  </div>
+  <div class="card">
+    <div class="label">今日累计</div>
+    <div class="value blue">¥16.25</div>
+    <div class="detail">预算 ¥20.00 · 剩余 ¥3.75</div>
+  </div>
+  <div class="card">
+    <div class="label">本月</div>
+    <div class="value green">¥83.49</div>
+    <div class="detail">预算 ¥200.00 · 剩余 ¥116.51</div>
+  </div>
+  <div class="card">
+    <div class="label">按模型分布</div>
+    <div class="model-row"><span class="name">deepseek-v3</span><span class="amt">¥45.20</span></div>
+    <div class="model-row"><span class="name">qwen-max</span><span class="amt">¥22.15</span></div>
+    <div class="model-row"><span class="name">claude-4</span><span class="amt">$2.20 ≈ ¥16.06</span></div>
+  </div>
+</div>
+</body>
+</html>
