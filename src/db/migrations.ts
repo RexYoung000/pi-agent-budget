@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-import type { Database as BetterSqlite3Database } from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCHEMA_PATH = join(__dirname, "schema.sql");
@@ -23,7 +23,7 @@ export const CURRENT_VERSION = 1;
  *
  * 后续版本（v2+）应该改成按 version 顺序应用 ALTER / INSERT。
  */
-export function migrate(db: BetterSqlite3Database): void {
+export function migrate(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version INTEGER PRIMARY KEY,
@@ -33,9 +33,9 @@ export function migrate(db: BetterSqlite3Database): void {
 
   const applied = new Set(
     db
-      .prepare<unknown[], { version: number }>("SELECT version FROM schema_migrations")
+      .prepare("SELECT version FROM schema_migrations")
       .all()
-      .map((r) => r.version),
+      .map((r) => (r as { version: number }).version),
   );
 
   if (!applied.has(CURRENT_VERSION)) {

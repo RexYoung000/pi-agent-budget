@@ -38,8 +38,8 @@
     ],
     "image": "https://raw.githubusercontent.com/RexYoung000/pi-agent-budget/main/preview.png"
   },
-  "dependencies": {
-    "better-sqlite3": "^11.5.0"
+  "engines": {
+    "node": ">=22.13.0"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
@@ -48,7 +48,7 @@
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^0.78.0",
     "@earendil-works/pi-tui": "^0.78.0",
-    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^24.0.0",
     "typescript": "^5.6.0"
   }
 }
