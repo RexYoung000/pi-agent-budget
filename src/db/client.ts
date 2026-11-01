@@ -1,5 +1,5 @@
 /**
- * SQLite 客户端封装（better-sqlite3）
+ * SQLite 客户端封装（node:sqlite，Node 22.13+ 内置模块）
  *
  * 设计文档：../design.md §4.4 / §9
  */

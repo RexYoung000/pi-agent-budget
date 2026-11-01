@@ -374,7 +374,7 @@ By Tool:
 | 项目 | 选择 | 理由 |
 |---|---|---|
 | 运行时 | Node.js (pi 扩展标准) | 强制 |
-| 数据库 | `better-sqlite3` | 同步 API、零配置、单文件 |
+| 数据库 | `node:sqlite`（Node 22.13+ 内置） | 同步 API、零配置、单文件、无原生依赖 |
 | Schema 管理 | 手写 migration（不用 ORM） | 表少，简单 |
 | TUI 渲染 | pi 内置 widget API + ink | 跟随 pi 约定 |
 | 配置文件 | `~/.pi/budget.json` | 用户可手编辑 |
@@ -394,7 +394,7 @@ pi-agent-budget/
 │   ├── index.ts          # 扩展入口（pi.on 钩子注册）
 │   ├── db/
 │   │   ├── schema.sql
-│   │   ├── client.ts     # better-sqlite3 包装
+│   │   ├── client.ts     # node:sqlite 包装
 │   │   └── migrations.ts
 │   ├── core/
 │   │   ├── tracker.ts    # CostRecord 累计

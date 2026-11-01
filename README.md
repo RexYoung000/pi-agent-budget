@@ -23,7 +23,7 @@ Track token usage and costs as you chat with AI. A live widget sits below the in
 pi install npm:pi-agent-budget
 ```
 
-> Depends on `better-sqlite3` (native C++ addon). Requires build toolchain on first install: Xcode CLT on macOS (`xcode-select --install`), `build-essential` on Linux.
+> Requires Node.js 22.13+ (or any Node build with `node:sqlite`). No native addons, no compile step, no network-downloaded binaries.
 
 ---
 

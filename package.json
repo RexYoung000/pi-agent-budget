@@ -1,6 +1,6 @@
 {
   "name": "pi-agent-budget",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Pi extension: AI coding cost tracker with widget, budget limits, and CNY pricing for Chinese models.",
   "type": "module",
   "main": "./src/index.ts",
@@ -8,6 +8,7 @@
     "src/",
     "!src/__smoke__.ts",
     "README.md",
+    "CHANGELOG.md",
     "design.md",
     "examples/"
   ],
