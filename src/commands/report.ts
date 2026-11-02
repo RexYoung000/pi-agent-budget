@@ -26,6 +26,8 @@ import {
   type ByDimensionInput,
 } from "../ui/report.js";
 
+import type { CurrencyCode } from "../core/pricing.js";
+
 export type { ReportRange };
 export function parseRange(arg: string | undefined): ReportRange {
   switch ((arg ?? "").trim().toLowerCase()) {
@@ -64,6 +66,7 @@ export async function runReport(
   db: BudgetDb,
   range: ReportRange,
   ctx: { ui: Pick<ExtensionUIContext, "notify"> },
+  currency: CurrencyCode = "USD",
 ): Promise<string> {
   const now = Date.now();
   const since = rangeToSince(range, now);
@@ -74,6 +77,7 @@ export async function runReport(
   const byTool = db.aggregateBy("tool", since);
 
   const input: ReportInput = {
+    currency,
     range,
     since,
     until: now,
@@ -97,6 +101,7 @@ export async function runBy(
   dim: "model" | "tool" | "session",
   range: ReportRange,
   ctx: { ui: Pick<ExtensionUIContext, "notify"> },
+  currency: CurrencyCode = "USD",
 ): Promise<string> {
   const now = Date.now();
   const since = rangeToSince(range, now);
@@ -105,6 +110,7 @@ export async function runBy(
   const rows = db.aggregateBy(dim, since);
 
   const input: ByDimensionInput = {
+    currency,
     dim,
     since,
     until: now,

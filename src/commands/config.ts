@@ -18,6 +18,8 @@ import {
   budgetPresets,
   currencyLabel,
   formatBudgetPreset,
+  usdToDisplay,
+  displayToUsd,
   getPricingInfo,
   markPricingUpdated,
   type PricingAnchor,
@@ -141,11 +143,10 @@ export function createBudgetListForDashboard(
 ): LocalizedSettingsList {
   let current = clone(initialConfig);
   const pricing = getPricingInfo(current, model);
-  // 预算金额始终跟随锚点货币（followModel 时仍为 USD）
-  const budgetCurrency = pricing.anchor === "cny" ? "CNY" : "USD";
-  const presets = budgetPresets(pricing.anchor);
+  const budgetCurrency = pricing.displayCurrency;
+  const presets = budgetPresets(budgetCurrency);
   const budget = current.session?.usd ?? 0;
-  const currentBudget = formatBudgetPreset(budget, budgetCurrency);
+  const currentBudget = formatBudgetPreset(usdToDisplay(budget, budgetCurrency), budgetCurrency);
   const budgetValues = presets.map((v) => formatBudgetPreset(v, budgetCurrency));
 
   const items: LocalizedSettingItem[] = [
@@ -197,7 +198,7 @@ export function createBudgetListForDashboard(
           next.session = Object.keys(rest).length ? rest : undefined;
         }
       } else {
-        next.session = { ...(next.session ?? {}), usd: amount };
+        next.session = { ...(next.session ?? {}), usd: displayToUsd(amount, budgetCurrency) };
       }
     } else if (id === "clearBudget") {
       if (next.session) {
@@ -297,18 +298,28 @@ export async function openWidgetSettings(
   config: BudgetConfig,
   ui: ExtensionUIContext,
   onSave: (config: BudgetConfig) => void,
+  model?: string,
 ): Promise<BudgetConfig> {
   let current = clone(config);
   return (await ui.custom<BudgetConfig>((_tui, _theme, _kb, done) => {
-    const base = createSettingsListForDashboard(current, undefined, (c) => {
+    const buildList = (): LocalizedSettingsList => createSettingsListForDashboard(current, model, (c) => {
       current = c;
       onSave(c);
     });
+    let base = buildList();
     return {
       render: (width: number) => base.render(width),
       handleInput: (data: string) => {
         if (data === "\x1b") done(current);
-        else base.handleInput(data);
+        else {
+          base.handleInput(data);
+          if (data === "\r" || data === " ") {
+            const selected = base.getSelectedIndex();
+            base = buildList();
+            base.setSelectedIndex(selected);
+          }
+          _tui.requestRender();
+        }
       },
       invalidate: () => base.invalidate?.(),
     };
@@ -319,6 +330,7 @@ export async function openFullSettings(
   config: BudgetConfig,
   ui: ExtensionUIContext,
   onSave: (config: BudgetConfig) => void,
+  model?: string,
 ): Promise<BudgetConfig> {
-  return openWidgetSettings(config, ui, onSave);
+  return openWidgetSettings(config, ui, onSave, model);
 }

@@ -33,7 +33,7 @@ import {
 import { renderOverview, type OverviewInput } from "./commands/overview.js";
 import { parseRange, parseByDim, runReport, runBy, rangeToSince, type ReportRange } from "./commands/report.js";
 import { openWidgetSettings, openFullSettings, createSettingsListForDashboard, createBudgetListForDashboard, createPricingListForDashboard } from "./commands/config.js";
-import { getPricingInfo, formatMoney, usdToDisplay, formatUsdInCurrency, currencyLabel, calculateCostFromTokens, lookupModelPrice, USD_TO_CNY } from "./core/pricing.js";
+import { getPricingInfo, formatMoney, usdToDisplay, formatUsdInCurrency, currencyLabel, calculateCostFromTokens, lookupModelPrice, displayToUsd } from "./core/pricing.js";
 import { parseExportFormat, runExport as runExportCommand } from "./commands/export.js";
 
 export default function (pi: ExtensionAPI) {
@@ -158,7 +158,7 @@ export default function (pi: ExtensionAPI) {
         const newAmount = await askNewBudget(ui, displayBudget, pricing.symbol);
         if (newAmount && newAmount > 0) {
           // 用户在弹窗输入的是显示币种金额，转回 USD 存储
-          const usdAmount = pricing.displayCurrency === "CNY" ? newAmount / USD_TO_CNY : newAmount;
+          const usdAmount = displayToUsd(newAmount, pricing.displayCurrency);
           config = applySet({ scope: "session", amount: usdAmount }, config);
           softLimitAlreadyShown.delete(key);
           ui.notify(t("set.raisedTo", { amount: formatMoney(newAmount, pricing.displayCurrency) }), "info");
@@ -370,7 +370,7 @@ export default function (pi: ExtensionAPI) {
         const newAmount = await askNewBudget(ctx.ui, displayBudget, pricing.symbol);
         if (newAmount && newAmount > 0) {
           // 用户在弹窗输入的是显示币种金额，转回 USD 存储
-          const usdAmount = pricing.displayCurrency === "CNY" ? newAmount / USD_TO_CNY : newAmount;
+          const usdAmount = displayToUsd(newAmount, pricing.displayCurrency);
           config = applySet({ scope: "session", amount: usdAmount }, config);
           ctx.ui.notify(t("set.raisedTo", { amount: formatMoney(newAmount, pricing.displayCurrency) }) + ", " + t("set.continued"), "info");
           return { action: "continue" as const };
@@ -447,12 +447,12 @@ export default function (pi: ExtensionAPI) {
       usedUsd = modelName ? tracker.sessionModelUsd(sessionId, modelName) : tracker.sessionUsd(sessionId);
     } catch { /* ignore */ }
 
-    const pricing = getPricingInfo(config, modelName);
-    const budgetUsd = config.session?.usd;
-    const status = checkSessionLimit(usedUsd, budgetUsd ?? 0, config);
     const context = ctx.getContextUsage?.();
 
     const overviewText = () => {
+      const pricing = getPricingInfo(config, modelName);
+      const budgetUsd = config.session?.usd;
+      const status = checkSessionLimit(usedUsd, budgetUsd ?? 0, config);
       const lines: string[] = [];
       lines.push(`${t("overview.sessionCost")}: ${formatUsdInCurrency(usedUsd, pricing.displayCurrency)}${budgetUsd && budgetUsd > 0 ? ` / ${formatUsdInCurrency(budgetUsd, pricing.displayCurrency)}` : ` (${t("overview.noBudget")})`}`);
       lines.push(`${t("overview.model")}: ${modelName || t("report.unknown")}`);
@@ -475,8 +475,13 @@ export default function (pi: ExtensionAPI) {
       return lines.join("\n");
     };
 
-    await ctx.ui.custom<void>((_tui, theme, _kb, done) => {
-      return createDashboard(
+    if (!ctx.hasUI || ("mode" in ctx && ctx.mode !== "tui")) {
+      ctx.ui.notify(overviewText(), "info");
+      return;
+    }
+
+    await ctx.ui.custom<void>((tui, theme, _kb, done) => {
+      const dashboard = createDashboard(
         { overview: overviewText },
         theme,
         {
@@ -495,6 +500,13 @@ export default function (pi: ExtensionAPI) {
         },
         () => done(),
       );
+      return {
+        ...dashboard,
+        handleInput(data: string) {
+          dashboard.handleInput(data);
+          tui.requestRender();
+        },
+      };
     });
   }
 
@@ -554,7 +566,7 @@ export default function (pi: ExtensionAPI) {
     }
     try {
       const db = await getDb();
-      await runReport(db, range, ctx);
+      await runReport(db, range, ctx, getPricingInfo(config, ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay).displayCurrency);
     } catch (err) {
       ctx.ui.notify(t("report.generationFailed") + `: ${(err as Error).message}`, "error");
     }
@@ -575,15 +587,16 @@ export default function (pi: ExtensionAPI) {
     }
     try {
       const db = await getDb();
-      await runBy(db, dim, range, ctx);
+      await runBy(db, dim, range, ctx, getPricingInfo(config, ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay).displayCurrency);
     } catch (err) {
       ctx.ui.notify(t("error.sliceFailed") + `: ${(err as Error).message}`, "error");
     }
   }
 
   async function runConfigCommand(ctx: ExtensionCommandContext): Promise<void> {
+    if (!ctx.hasUI || ("mode" in ctx && ctx.mode !== "tui")) return;
     try {
-      config = await openFullSettings(config, ctx.ui, (c) => { config = c; });
+      config = await openFullSettings(config, ctx.ui, (c) => { config = c; refreshWidgetAfterConfig(ctx); }, ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay);
       refreshWidgetAfterConfig(ctx);
     } catch (err) {
       ctx.ui.notify(t("error.settingsFailed") + `: ${(err as Error).message}`, "error");
@@ -591,8 +604,9 @@ export default function (pi: ExtensionAPI) {
   }
 
   async function runWidgetCommand(ctx: ExtensionCommandContext): Promise<void> {
+    if (!ctx.hasUI || ("mode" in ctx && ctx.mode !== "tui")) return;
     try {
-      config = await openWidgetSettings(config, ctx.ui, (c) => { config = c; });
+      config = await openWidgetSettings(config, ctx.ui, (c) => { config = c; refreshWidgetAfterConfig(ctx); }, ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay);
       refreshWidgetAfterConfig(ctx);
     } catch (err) {
       ctx.ui.notify(t("error.settingsFailed") + `: ${(err as Error).message}`, "error");
@@ -605,12 +619,12 @@ export default function (pi: ExtensionAPI) {
     if (!uiRef) return;
     const sessionId = getSessionId(ctx);
     const modelName = ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay;
-    try {
-      getTracker().then((tracker) => {
-        const usedModelUsd = modelName ? tracker.sessionModelUsd(sessionId, modelName) : tracker.sessionUsd(sessionId);
-        refreshWidget(uiRef!, ctx, usedModelUsd);
-      });
-    } catch { /* ignore */ }
+    const ui = uiRef;
+    getTracker().then((tracker) => {
+      if (uiRef !== ui) return; // A closed or replaced session must not receive a pending refresh.
+      const usedModelUsd = modelName ? tracker.sessionModelUsd(sessionId, modelName) : tracker.sessionUsd(sessionId);
+      refreshWidget(ui, ctx, usedModelUsd);
+    }).catch(() => {});
   }
 
   async function runExportCmd(args: string, ctx: ExtensionCommandContext): Promise<void> {

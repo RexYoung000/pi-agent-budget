@@ -21,6 +21,14 @@ export class LocalizedSettingsList implements Component {
     private onCancel: () => void,
   ) {}
 
+  getSelectedIndex(): number {
+    return this.selectedIndex;
+  }
+
+  setSelectedIndex(index: number): void {
+    this.selectedIndex = Math.max(0, Math.min(index, this.items.length - 1));
+  }
+
   updateValue(id: string, newValue: string): void {
     const item = this.items.find((i) => i.id === id);
     if (item) item.currentValue = newValue;

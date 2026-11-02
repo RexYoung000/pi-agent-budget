@@ -9,6 +9,7 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
 import { visibleWidth, truncateToWidth } from "@earendil-works/pi-tui";
 
+import { LocalizedSettingsList } from "./localized-settings-list.js";
 import { t } from "../i18n/index.js";
 
 export interface DashboardInput {
@@ -53,20 +54,25 @@ export function createDashboard(
 ): { render(width: number): string[]; handleInput(data: string): boolean; invalidate(): void } {
   let activeTab = 0;
   const MAX_CONTENT = 20;
+  const selectedRows = [0, 0, 0];
   const lists: Array<Component | null> = [null, null, null];
 
   function getList(tab: number): Component {
     const idx = tab - 1;
     if (!lists[idx]) {
-      lists[idx] = tab === 1 ? deps.budgetFactory() : tab === 2 ? deps.pricingFactory() : deps.settingsFactory();
+      const list = tab === 1 ? deps.budgetFactory() : tab === 2 ? deps.pricingFactory() : deps.settingsFactory();
+      if (list instanceof LocalizedSettingsList) list.setSelectedIndex(selectedRows[idx] ?? 0);
+      lists[idx] = list;
     }
     return lists[idx]!;
   }
 
   function resetAllLists(): void {
-    lists[0] = null;
-    lists[1] = null;
-    lists[2] = null;
+    for (let i = 0; i < lists.length; i++) {
+      const list = lists[i];
+      if (list instanceof LocalizedSettingsList) selectedRows[i] = list.getSelectedIndex();
+      lists[i] = null;
+    }
   }
 
   return {
@@ -103,7 +109,7 @@ export function createDashboard(
       lines.push(`│ ${hint}${" ".repeat(Math.max(0, width - hintVis - 3))}│`);
       lines.push(theme.fg("accent", "└" + "─".repeat(width - 2) + "┘"));
 
-      return lines;
+      return lines.map((line) => truncateToWidth(line, width));
     },
 
     handleInput(data: string): boolean {

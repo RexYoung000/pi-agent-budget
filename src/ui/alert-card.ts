@@ -66,7 +66,7 @@ export async function showHardLimitCard(
 }
 
 /**
- * 让用户输入新的预算金额。返回数字（USD），用户取消或解析失败 → undefined。
+ * 让用户输入新的预算金额。返回数字（与当前显示币种相同），用户取消或解析失败 → undefined。
  */
 export async function askNewBudget(
   ui: Pick<ExtensionUIContext, "input">,
@@ -75,8 +75,8 @@ export async function askNewBudget(
 ): Promise<number | undefined> {
   const sym = symbol ?? "$";
   const placeholder = current
-    ? t("alert.newBudget.message") + ` (${t("set.scope.session")} ${sym}${current.toFixed(2)})`
-    : t("alert.newBudget.message");
+    ? t("alert.newBudget.message", { currency: sym === "¥" ? "CNY / ¥" : "USD / $" }) + ` (${t("set.scope.session")} ${sym}${current.toFixed(2)})`
+    : t("alert.newBudget.message", { currency: sym === "¥" ? "CNY / ¥" : "USD / $" });
   const raw = await ui.input(t("alert.newBudget.title"), placeholder);
   if (raw == null) return undefined;
   const n = Number(raw.trim());

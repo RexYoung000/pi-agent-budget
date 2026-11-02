@@ -321,10 +321,12 @@ export function formatUsdInCurrency(usd: number, currency: CurrencyCode): string
   return formatMoney(usdToDisplay(usd, currency), currency);
 }
 
-export function budgetPresets(anchor: PricingAnchor): number[] {
-  // 只有用户明确选择 CNY 锚点时，预设才用人民币金额。
-  // followModel 模式下模型可能被识别为 CNY 但预算仍用 USD。
-  return anchor === "cny" ? [0, 5, 10, 20, 50] : [0, 1, 2, 5, 10];
+export function displayToUsd(amount: number, currency: CurrencyCode): number {
+  return currency === "CNY" ? amount / USD_TO_CNY : amount;
+}
+
+export function budgetPresets(currency: CurrencyCode): number[] {
+  return currency === "CNY" ? [0, 5, 10, 20, 50] : [0, 1, 2, 5, 10];
 }
 
 export function formatBudgetPreset(amount: number, currency: CurrencyCode): string {

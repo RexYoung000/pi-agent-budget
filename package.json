@@ -1,6 +1,6 @@
 {
   "name": "pi-agent-budget",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Pi extension: AI coding cost tracker with widget, budget limits, and CNY pricing for Chinese models.",
   "type": "module",
   "main": "./src/index.ts",
@@ -31,7 +31,8 @@
     "widget"
   ],
   "scripts": {
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts"
   },
   "pi": {
     "extensions": [
@@ -50,6 +51,7 @@
     "@earendil-works/pi-coding-agent": "^0.78.0",
     "@earendil-works/pi-tui": "^0.78.0",
     "@types/node": "^24.0.0",
+    "tsx": "^4.23.15",
     "typescript": "^5.6.0"
   }
 }
