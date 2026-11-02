@@ -7,7 +7,7 @@
 
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
-import { visibleWidth, truncateToWidth } from "@earendil-works/pi-tui";
+import { Key, matchesKey, visibleWidth, truncateToWidth } from "@earendil-works/pi-tui";
 
 import { LocalizedSettingsList } from "./localized-settings-list.js";
 import { t } from "../i18n/index.js";
@@ -113,31 +113,32 @@ export function createDashboard(
     },
 
     handleInput(data: string): boolean {
-      if (data === "\x1b") {
+      // 按键用 matchesKey 判定，才能同时识别传统字节序列和 Kitty / modifyOtherKeys 协议。
+      if (matchesKey(data, Key.escape)) {
         onClose();
         return true;
       }
 
-      if (data === "\x1b[D" || data === "left") {
+      if (matchesKey(data, Key.left)) {
         activeTab = (activeTab - 1 + 4) % 4;
         return true;
       }
-      if (data === "\x1b[C" || data === "right") {
+      if (matchesKey(data, Key.right)) {
         activeTab = (activeTab + 1) % 4;
         return true;
       }
 
       if (activeTab > 0) {
-        const isListInput = data === "\x1b[A" || data === "up" || data === "\x1b[B" || data === "down" || data === "\r" || data === " ";
+        const isToggle = matchesKey(data, Key.enter) || matchesKey(data, Key.space);
+        const isListInput = isToggle || matchesKey(data, Key.up) || matchesKey(data, Key.down);
         if (isListInput) {
           getList(activeTab).handleInput?.(data);
           // 设置变更后重建所有列表，确保语言/币种/联动值在全部页面立即刷新。
-          if (data === "\r" || data === " ") resetAllLists();
+          if (isToggle) resetAllLists();
           return true;
         }
       }
 
-      if (data === "\x1b[A" || data === "up" || data === "\x1b[B" || data === "down") return true;
       return true;
     },
 

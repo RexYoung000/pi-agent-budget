@@ -115,25 +115,25 @@ test("open dashboard updates overview, budget, widget and reports without reopen
     await handlers.get("session_start")!({}, ctx);
     await command.handler("", ctx);
     assert.match(dashboard.render(120).join("\n"), /\$1\.00/);
-    dashboard.handleInput("right"); // budget
+    dashboard.handleInput("\x1b[C"); // budget
     assert.match(dashboard.render(120).join("\n"), /\$1\.00/);
-    dashboard.handleInput("right"); // pricing
+    dashboard.handleInput("\x1b[C"); // pricing
     dashboard.handleInput("\r"); // usd -> followModel -> CNY for DeepSeek
     assert.match(dashboard.render(120).join("\n"), /CNY/);
-    dashboard.handleInput("left");
+    dashboard.handleInput("\x1b[D");
     assert.match(dashboard.render(120).join("\n"), /¥7\.20/);
-    dashboard.handleInput("left");
+    dashboard.handleInput("\x1b[D");
     assert.match(dashboard.render(120).join("\n"), /¥7\.20/);
     await new Promise<void>((resolve) => setImmediate(resolve));
     assert.match(widget, /¥7\.20/);
     assert.equal(JSON.parse(readFileSync(CONFIG_PATH, "utf8")).session.usd, 1);
-    dashboard.handleInput("left"); // settings
+    dashboard.handleInput("\x1b[D"); // settings
     dashboard.handleInput("\r"); // English -> Chinese
     assert.match(dashboard.render(120).join("\n"), /简体中文/);
-    dashboard.handleInput("down");
+    dashboard.handleInput("\x1b[B");
     dashboard.handleInput("\r"); // followModel -> cny
     dashboard.handleInput("\r"); // cny -> usd; selection must stay on anchor row
-    dashboard.handleInput("right");
+    dashboard.handleInput("\x1b[C");
     assert.match(dashboard.render(120).join("\n"), /\$1\.00/);
     await command.handler("report", ctx);
     assert.match(notifications.at(-1)!, /\$0\.00/);
@@ -144,22 +144,22 @@ test("open dashboard updates overview, budget, widget and reports without reopen
       for (const line of dashboard.render(width)) assert.ok(visibleWidth(line) <= width);
     }
     await command.handler("config", ctx);
-    dashboard.handleInput("down");
+    dashboard.handleInput("\x1b[B");
     dashboard.handleInput("\r"); // usd -> followModel, respecting current DeepSeek model
-    dashboard.handleInput("down"); // Mode description contains the live preview.
+    dashboard.handleInput("\x1b[B"); // Mode description contains the live preview.
     assert.match(dashboard.render(120).join("\n"), /¥/);
-    dashboard.handleInput("up");
+    dashboard.handleInput("\x1b[A");
     dashboard.handleInput("\r"); // followModel -> cny
     dashboard.handleInput("\r"); // cny -> usd, preserving selection
-    dashboard.handleInput("down");
+    dashboard.handleInput("\x1b[B");
     assert.match(dashboard.render(120).join("\n"), /\$/);
     assert.equal(JSON.parse(readFileSync(CONFIG_PATH, "utf8")).pricingAnchor, "usd");
     await command.handler("fx fixed 5", ctx);
     await command.handler("", ctx);
-    dashboard.handleInput("right");
-    dashboard.handleInput("right");
+    dashboard.handleInput("\x1b[C");
+    dashboard.handleInput("\x1b[C");
     dashboard.handleInput("\r"); // usd -> followModel (CNY)
-    dashboard.handleInput("left");
+    dashboard.handleInput("\x1b[D");
     assert.match(dashboard.render(120).join("\n"), /¥10\.00/);
     dashboard.handleInput("\r"); // ¥10 -> ¥20, stores $4 at rate 5
     assert.equal(JSON.parse(readFileSync(CONFIG_PATH, "utf8")).session.usd, 4);
@@ -177,8 +177,8 @@ test("open dashboard updates overview, budget, widget and reports without reopen
     await new Promise<void>((resolve) => setImmediate(resolve));
     assert.match(widget, /¥24\.00/);
     // A settings list created before refresh must not overwrite the new cache.
-    dashboard.handleInput("left");
-    dashboard.handleInput("left");
+    dashboard.handleInput("\x1b[D");
+    dashboard.handleInput("\x1b[D");
     dashboard.handleInput("\r");
     assert.equal(JSON.parse(readFileSync(CONFIG_PATH, "utf8")).exchangeRate.cachedRate, 6);
     await command.handler("fx fixed 0", ctx);

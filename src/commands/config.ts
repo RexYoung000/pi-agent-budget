@@ -7,6 +7,7 @@
 
 import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import type { SettingsListTheme } from "@earendil-works/pi-tui";
+import { Key, matchesKey } from "@earendil-works/pi-tui";
 import { LocalizedSettingsList, type LocalizedSettingItem } from "../ui/localized-settings-list.js";
 
 import type { BudgetConfig, WidgetConfig } from "../config.js";
@@ -318,10 +319,11 @@ export async function openWidgetSettings(
     return {
       render: (width: number) => base.render(width),
       handleInput: (data: string) => {
-        if (data === "\x1b") done(current);
+        // matchesKey 兼容传统序列与 Kitty / modifyOtherKeys 协议，否则 ESC 在部分终端无法退出。
+        if (matchesKey(data, Key.escape)) done(current);
         else {
           base.handleInput(data);
-          if (data === "\r" || data === " ") {
+          if (matchesKey(data, Key.enter) || matchesKey(data, Key.space)) {
             const selected = base.getSelectedIndex();
             base = buildList();
             base.setSelectedIndex(selected);

@@ -1,5 +1,5 @@
 import type { Component } from "@earendil-works/pi-tui";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { Key, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 import { t } from "../i18n/index.js";
 
@@ -81,19 +81,20 @@ export class LocalizedSettingsList implements Component {
   }
 
   handleInput(data: string): void {
-    if (data === "\x1b") {
+    // matchesKey 同时覆盖传统序列与 Kitty / modifyOtherKeys 协议，避免 ESC、方向键在部分终端失效。
+    if (matchesKey(data, Key.escape)) {
       this.onCancel();
       return;
     }
-    if (data === "\x1b[A" || data === "up") {
+    if (matchesKey(data, Key.up)) {
       this.selectedIndex = this.selectedIndex === 0 ? this.items.length - 1 : this.selectedIndex - 1;
       return;
     }
-    if (data === "\x1b[B" || data === "down") {
+    if (matchesKey(data, Key.down)) {
       this.selectedIndex = this.selectedIndex === this.items.length - 1 ? 0 : this.selectedIndex + 1;
       return;
     }
-    if (data === "\r" || data === " ") {
+    if (matchesKey(data, Key.enter) || matchesKey(data, Key.space)) {
       const item = this.items[this.selectedIndex];
       if (!item?.values?.length) return;
       const currentIndex = item.values.indexOf(item.currentValue);

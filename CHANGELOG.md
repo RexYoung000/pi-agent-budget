@@ -2,6 +2,17 @@
 
 本文件记录 pi-agent-budget 的用户可见变更。0.1.7 之前的版本未单独记录条目。
 
+## [0.1.9] - 2026-11-02
+
+### Fixed
+
+- 修复终端开启 Kitty 键盘协议（如 Orca、Ghostty、kitty、WezTerm）时，`/budget` 面板按 ESC 无法退出、方向键也无法切换标签和选项的问题。按键判定统一走 pi-tui 的 `matchesKey`，同时兼容传统字节序列、Kitty CSI-u 和 xterm modifyOtherKeys 三种编码；`/budget config` 与 `/budget widget` 面板一并修复。
+
+### Tests
+
+- 新增 `tests/keys.test.ts`，对仪表盘与设置列表同时投递传统序列和 Kitty 序列，覆盖 ESC 退出、左右切换标签、上下选中、Enter/Space 修改取值。
+- 原有面板联动测试改用真实终端按键字节，不再依赖已移除的裸键名（如 `"right"`）。
+
 ## [0.1.8] - 2026-11-02
 
 ### Fixed
