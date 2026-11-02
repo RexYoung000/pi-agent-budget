@@ -67,6 +67,7 @@ export async function runReport(
   range: ReportRange,
   ctx: { ui: Pick<ExtensionUIContext, "notify"> },
   currency: CurrencyCode = "USD",
+  exchangeRate?: number,
 ): Promise<string> {
   const now = Date.now();
   const since = rangeToSince(range, now);
@@ -78,6 +79,7 @@ export async function runReport(
 
   const input: ReportInput = {
     currency,
+    exchangeRate,
     range,
     since,
     until: now,
@@ -102,6 +104,7 @@ export async function runBy(
   range: ReportRange,
   ctx: { ui: Pick<ExtensionUIContext, "notify"> },
   currency: CurrencyCode = "USD",
+  exchangeRate?: number,
 ): Promise<string> {
   const now = Date.now();
   const since = rangeToSince(range, now);
@@ -111,6 +114,7 @@ export async function runBy(
 
   const input: ByDimensionInput = {
     currency,
+    exchangeRate,
     dim,
     since,
     until: now,

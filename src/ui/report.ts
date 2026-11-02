@@ -15,6 +15,7 @@ export type ReportRange = "today" | "week" | "month" | "all";
 
 export interface ReportInput {
   currency?: CurrencyCode;
+  exchangeRate?: number;
   range: ReportRange;
   since: number; // unix ms
   until: number; // unix ms
@@ -67,17 +68,17 @@ function padRight(s: string, width: number): string {
 }
 
 /** 渲染单条 by-xxx 行（含百分比 + 进度条）。 */
-function renderRow(label: string, total: number, sum: number, maxLabelWidth: number, currency: CurrencyCode): string {
+function renderRow(label: string, total: number, sum: number, maxLabelWidth: number, currency: CurrencyCode, exchangeRate?: number): string {
   const pct = sum > 0 ? (total / sum) * 100 : 0;
   const pctStr = pct.toFixed(0).padStart(2, " ");
   const bar = renderBar(pct / 100, 12);
-  return `  ${padRight(label, maxLabelWidth)}  ${formatUsdInCurrency(total, currency).padStart(7)}  (${pctStr}%) ${bar}`;
+  return `  ${padRight(label, maxLabelWidth)}  ${formatUsdInCurrency(total, currency, exchangeRate).padStart(7)}  (${pctStr}%) ${bar}`;
 }
 
 /** 主渲染函数：返回多行字符串。 */
 export function renderReport(input: ReportInput): string {
   const lines: string[] = [];
-  const money = (usd: number) => formatUsdInCurrency(usd, input.currency ?? "USD");
+  const money = (usd: number) => formatUsdInCurrency(usd, input.currency ?? "USD", input.exchangeRate);
 
   // header
   lines.push(`📦 ${rangeTitle(input.range)} (${fmtDate(input.until)})`);
@@ -99,7 +100,7 @@ export function renderReport(input: ReportInput): string {
     const sum = input.byModel.reduce((s, r) => s + r.total, 0);
     const maxLabel = Math.max(...input.byModel.map((r) => r.key.length), 8);
     for (const r of input.byModel) {
-      lines.push(renderRow(r.key || t("report.unknown"), r.total, sum, maxLabel, input.currency ?? "USD"));
+      lines.push(renderRow(r.key || t("report.unknown"), r.total, sum, maxLabel, input.currency ?? "USD", input.exchangeRate));
     }
   } else {
     lines.push("");
@@ -115,11 +116,11 @@ export function renderReport(input: ReportInput): string {
     const maxLabel = Math.max(...visible.map((r) => r.key.length), 8);
     for (const r of input.byTool) {
       if (!r.key) continue;
-      lines.push(renderRow(r.key, r.total, sum, maxLabel, input.currency ?? "USD"));
+      lines.push(renderRow(r.key, r.total, sum, maxLabel, input.currency ?? "USD", input.exchangeRate));
     }
     const noTool = input.byTool.find((r) => !r.key);
     if (noTool) {
-      lines.push(renderRow(t("report.noTool"), noTool.total, sum, maxLabel, input.currency ?? "USD"));
+      lines.push(renderRow(t("report.noTool"), noTool.total, sum, maxLabel, input.currency ?? "USD", input.exchangeRate));
     }
   } else {
     lines.push("");
@@ -132,6 +133,7 @@ export function renderReport(input: ReportInput): string {
 /** 单维度切片子报表（用于 /budget by <dim>）。 */
 export interface ByDimensionInput {
   currency?: CurrencyCode;
+  exchangeRate?: number;
   dim: "model" | "tool" | "session";
   since: number;
   until: number;
@@ -140,7 +142,7 @@ export interface ByDimensionInput {
 }
 
 export function renderByDimension(input: ByDimensionInput): string {
-  const money = (usd: number) => formatUsdInCurrency(usd, input.currency ?? "USD");
+  const money = (usd: number) => formatUsdInCurrency(usd, input.currency ?? "USD", input.exchangeRate);
   const label = dimLabel(input.dim);
   const lines: string[] = [];
 
@@ -163,10 +165,10 @@ export function renderByDimension(input: ByDimensionInput): string {
   const maxLabel = Math.max(...visible.map((r) => r.key.length), 8);
 
   for (const r of visible) {
-    lines.push(renderRow(r.key, r.total, input.totalUsd, maxLabel, input.currency ?? "USD"));
+    lines.push(renderRow(r.key, r.total, input.totalUsd, maxLabel, input.currency ?? "USD", input.exchangeRate));
   }
   if (noKey) {
-    lines.push(renderRow(`(${label.toLowerCase()}?)`, noKey.total, input.totalUsd, maxLabel, input.currency ?? "USD"));
+    lines.push(renderRow(`(${label.toLowerCase()}?)`, noKey.total, input.totalUsd, maxLabel, input.currency ?? "USD", input.exchangeRate));
   }
 
   return lines.join("\n");

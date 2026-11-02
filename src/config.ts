@@ -5,6 +5,8 @@
  * 存储位置：~/.pi/budget.json
  */
 
+import type { ExchangeRateConfig } from "./core/exchange-rate.js";
+
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from "node:fs";
@@ -28,7 +30,8 @@ export interface BudgetConfig {
   pricingAnchor?: "followModel" | "cny" | "usd";
   /** 价格表更新日期（MVP 为内置价格表状态日期）。 */
   pricingUpdatedAt?: string;
-  /** 汇率更新日期（仅统一币种展示时使用）。 */
+  exchangeRate?: ExchangeRateConfig;
+  /** 旧版日期字段，不作为已获取汇率的凭证。 */
   fxUpdatedAt?: string;
 
   /** 手填 projectId，覆盖 git remote / cwd 自动识别。救命逃生口。 */

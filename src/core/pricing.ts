@@ -7,6 +7,7 @@
  */
 
 import type { BudgetConfig } from "../config.js";
+import { DEFAULT_USD_TO_CNY, DEFAULT_FX_DATE, effectiveExchangeRate, exchangeRateSource } from "./exchange-rate.js";
 import { t } from "../i18n/index.js";
 
 export type CurrencyCode = "USD" | "CNY";
@@ -21,6 +22,8 @@ export interface PricingInfo {
   symbol: string;
   priceDate: string;
   fxDate?: string;
+  exchangeRate: number;
+  fxSource: "fixed" | "cached" | "builtin";
   source: "builtin";
   status: "latest" | "updated";
 }
@@ -38,7 +41,7 @@ export interface ModelPrice {
 }
 
 /** 内置汇率：1 USD = 7.2 CNY（2026-06 参考） */
-export const USD_TO_CNY = 7.2;
+export const USD_TO_CNY = DEFAULT_USD_TO_CNY;
 
 /** 单次请求成本计算结果 */
 export interface CostBreakdown {
@@ -51,7 +54,7 @@ export interface CostBreakdown {
 }
 
 export const BUILTIN_PRICE_DATE = "2026-06-07";
-export const BUILTIN_FX_DATE = "2026-06-07";
+export const BUILTIN_FX_DATE = DEFAULT_FX_DATE;
 
 /** 内置模型价格表（USD / 1M tokens，2026-06-07 更新）。 */
 const BUILTIN_PRICES: Record<string, ModelPrice> = {
@@ -198,6 +201,7 @@ export function calculateCostFromTokens(
   cacheRead: number,
   cacheWrite: number,
   model?: string,
+  exchangeRate = USD_TO_CNY,
 ): CostBreakdown {
   const price = lookupModelPrice(model);
   const isCny = price.currency === "CNY";
@@ -207,12 +211,12 @@ export function calculateCostFromTokens(
   const cacheWriteCost = (cacheWrite / ONE_M) * (price.cacheWrite ?? price.input);
   const cacheReadCost = (cacheRead / ONE_M) * (price.cacheRead ?? price.input * 0.1);
   const rawTotal = inputCost + outputCost + cacheWriteCost + cacheReadCost;
-  const total = isCny ? rawTotal / USD_TO_CNY : rawTotal;
+  const total = isCny ? rawTotal / exchangeRate : rawTotal;
   return {
-    inputCost: isCny ? inputCost / USD_TO_CNY : inputCost,
-    outputCost: isCny ? outputCost / USD_TO_CNY : outputCost,
-    cacheReadCost: isCny ? cacheReadCost / USD_TO_CNY : cacheReadCost,
-    cacheWriteCost: isCny ? cacheWriteCost / USD_TO_CNY : cacheWriteCost,
+    inputCost: isCny ? inputCost / exchangeRate : inputCost,
+    outputCost: isCny ? outputCost / exchangeRate : outputCost,
+    cacheReadCost: isCny ? cacheReadCost / exchangeRate : cacheReadCost,
+    cacheWriteCost: isCny ? cacheWriteCost / exchangeRate : cacheWriteCost,
     total,
     method: "tokens",
   };
@@ -287,10 +291,12 @@ export function getPricingInfo(config: BudgetConfig, model?: string): PricingInf
     nativeCurrency: detected.nativeCurrency,
     displayCurrency,
     symbol: currencySymbol(displayCurrency),
-    priceDate: config.pricingUpdatedAt ?? BUILTIN_PRICE_DATE,
-    fxDate: displayCurrency === detected.nativeCurrency ? undefined : (config.fxUpdatedAt ?? BUILTIN_FX_DATE),
+    priceDate: BUILTIN_PRICE_DATE,
+    fxDate: exchangeRateSource(config) === "fixed" ? undefined : (exchangeRateSource(config) === "cached" ? config.exchangeRate?.rateDate : BUILTIN_FX_DATE),
+    exchangeRate: effectiveExchangeRate(config),
+    fxSource: exchangeRateSource(config),
     source: "builtin",
-    status: config.pricingUpdatedAt === todayIsoDate() ? "updated" : "latest",
+    status: "latest",
   };
 }
 
@@ -298,31 +304,23 @@ export function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function markPricingUpdated(config: BudgetConfig): BudgetConfig {
-  return {
-    ...config,
-    pricingUpdatedAt: todayIsoDate(),
-    fxUpdatedAt: todayIsoDate(),
-  };
-}
-
 export function formatMoney(amount: number, currency: CurrencyCode): string {
   return `${currencySymbol(currency)}${amount.toFixed(2)}`;
 }
 
 /** 把内部 USD 值转为显示货币。 */
-export function usdToDisplay(usd: number, currency: CurrencyCode): number {
-  if (currency === "CNY") return usd * USD_TO_CNY;
+export function usdToDisplay(usd: number, currency: CurrencyCode, exchangeRate = USD_TO_CNY): number {
+  if (currency === "CNY") return usd * exchangeRate;
   return usd;
 }
 
 /** 格式化 USD 值，自动转为显示货币后输出。 */
-export function formatUsdInCurrency(usd: number, currency: CurrencyCode): string {
-  return formatMoney(usdToDisplay(usd, currency), currency);
+export function formatUsdInCurrency(usd: number, currency: CurrencyCode, exchangeRate = USD_TO_CNY): string {
+  return formatMoney(usdToDisplay(usd, currency, exchangeRate), currency);
 }
 
-export function displayToUsd(amount: number, currency: CurrencyCode): number {
-  return currency === "CNY" ? amount / USD_TO_CNY : amount;
+export function displayToUsd(amount: number, currency: CurrencyCode, exchangeRate = USD_TO_CNY): number {
+  return currency === "CNY" ? amount / exchangeRate : amount;
 }
 
 export function budgetPresets(currency: CurrencyCode): number[] {

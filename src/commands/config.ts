@@ -18,10 +18,10 @@ import {
   budgetPresets,
   currencyLabel,
   formatBudgetPreset,
+  formatUsdInCurrency,
   usdToDisplay,
   displayToUsd,
   getPricingInfo,
-  markPricingUpdated,
   type PricingAnchor,
 } from "../core/pricing.js";
 
@@ -114,9 +114,8 @@ function localeFromLabel(label: string): Locale {
   return getSupportedLocales().find((l) => LOCALE_LABELS[l] === label) ?? "en";
 }
 
-function previewWidget(wc: WidgetConfig, sym: string): string {
+function previewWidget(wc: WidgetConfig, cost: string): string {
   const modelName = wc.showModel !== false ? "sonnet" : "";
-  const cost = `${sym}0.42/${sym}1.00`;
   const bar = wc.showProgressBar !== false ? " ████░░░░░░" : "";
   let preview = "🟢 ";
   if (modelName) preview += `${modelName} │ `;
@@ -146,7 +145,7 @@ export function createBudgetListForDashboard(
   const budgetCurrency = pricing.displayCurrency;
   const presets = budgetPresets(budgetCurrency);
   const budget = current.session?.usd ?? 0;
-  const currentBudget = formatBudgetPreset(usdToDisplay(budget, budgetCurrency), budgetCurrency);
+  const currentBudget = formatBudgetPreset(usdToDisplay(budget, budgetCurrency, pricing.exchangeRate), budgetCurrency);
   const budgetValues = presets.map((v) => formatBudgetPreset(v, budgetCurrency));
 
   const items: LocalizedSettingItem[] = [
@@ -198,7 +197,7 @@ export function createBudgetListForDashboard(
           next.session = Object.keys(rest).length ? rest : undefined;
         }
       } else {
-        next.session = { ...(next.session ?? {}), usd: displayToUsd(amount, budgetCurrency) };
+        next.session = { ...(next.session ?? {}), usd: displayToUsd(amount, budgetCurrency, pricing.exchangeRate) };
       }
     } else if (id === "clearBudget") {
       if (next.session) {
@@ -220,6 +219,7 @@ export function createPricingListForDashboard(
   initialConfig: BudgetConfig,
   model: string | undefined,
   onSave: (config: BudgetConfig) => void,
+  onRefresh: () => void = () => {},
 ): LocalizedSettingsList {
   let current = clone(initialConfig);
   const info = getPricingInfo(current, model);
@@ -231,8 +231,11 @@ export function createPricingListForDashboard(
     { id: "nativeCurrency", label: t("pricing.nativeCurrency"), description: t("pricing.nativeCurrency.description"), currentValue: currencyLabel(info.nativeCurrency) },
     { id: "displayCurrency", label: t("pricing.displayCurrency"), description: t("pricing.displayCurrency.description"), currentValue: currencyLabel(info.displayCurrency) },
     { id: "priceDate", label: t("pricing.priceDate"), description: t("pricing.priceDate.description"), currentValue: info.priceDate },
+    { id: "fxMode", label: t("fx.mode"), description: t("fx.mode.description"), currentValue: t(current.exchangeRate?.mode === "fixed" ? "fx.fixed" : "fx.auto"), values: [t("fx.auto"), t("fx.fixed")] },
+    { id: "fxRate", label: t("fx.rate"), description: t("fx.rate.description"), currentValue: `1 USD = ${info.exchangeRate} CNY` },
+    { id: "fxStatus", label: t("fx.status"), description: current.exchangeRate?.mode !== "fixed" && current.exchangeRate?.lastError ? t("fx.failure") : t("fx.source.description"), currentValue: `${current.exchangeRate?.mode !== "fixed" && current.exchangeRate?.lastError ? t("fx.failed") + " · " : ""}${t(info.fxSource === "fixed" ? "fx.fixed" : info.fxSource === "cached" ? "fx.cached" : "fx.builtin")}` },
     { id: "fxDate", label: t("pricing.fxDate"), description: t("pricing.fxDate.description"), currentValue: info.fxDate ?? t("pricing.fxDate.notNeeded") },
-    { id: "updatePricing", label: t("pricing.updateToday"), description: t("pricing.updateToday.description"), currentValue: t("pricing.status.latest"), values: [t("pricing.action.update")] },
+    { id: "updatePricing", label: t("pricing.updateToday"), description: t("pricing.updateToday.description"), currentValue: t("fx.ready"), values: [t("pricing.action.update")] },
   ];
 
   return new LocalizedSettingsList(items, 12, (id, newValue) => {
@@ -240,8 +243,12 @@ export function createPricingListForDashboard(
     if (id === "anchor") {
       const key = ANCHOR_KEYS.find((k) => anchorLabel(k) === newValue) ?? "followModel";
       next.pricingAnchor = key;
+    } else if (id === "fxMode") {
+      const mode = newValue === t("fx.fixed") ? "fixed" : "auto";
+      next.exchangeRate = { ...next.exchangeRate, mode, fixedRate: next.exchangeRate?.fixedRate ?? info.exchangeRate };
     } else if (id === "updatePricing") {
-      Object.assign(next, markPricingUpdated(next));
+      onRefresh();
+      return;
     }
     current = save(next, onSave);
   }, () => {});
@@ -256,14 +263,15 @@ export function createSettingsListForDashboard(
   const wc: WidgetConfig = { ...DEFAULT_WIDGET_CONFIG, ...(current.widget ?? {}) };
   const pricing = getPricingInfo(current, model);
   const currentMode = currentModeKey(wc);
+  const costPreview = `${formatUsdInCurrency(0.42, pricing.displayCurrency, pricing.exchangeRate)}/${formatUsdInCurrency(1, pricing.displayCurrency, pricing.exchangeRate)}`;
 
   const items: LocalizedSettingItem[] = [
     { id: "locale", label: t("config.locale"), description: t("config.locale.description"), currentValue: localeLabel(current.locale), values: getSupportedLocales().map(localeLabel) },
     { id: "pricingAnchor", label: t("pricing.anchor"), description: t("pricing.anchor.description"), currentValue: anchorLabel(pricing.anchor), values: ANCHOR_KEYS.map(anchorLabel) },
-    { id: "mode", label: t("widget.config.mode"), description: `${t("widget.config.livePreview")}:\n  ${previewWidget(wc, pricing.symbol)}\n\n${t("widget.config.modeDescription", { compact: modeLabel(MODE_COMPACT), full: modeLabel(MODE_FULL), custom: modeLabel(MODE_CUSTOM) })}`, currentValue: modeLabel(currentMode), values: MODE_KEYS.map(modeLabel) },
+    { id: "mode", label: t("widget.config.mode"), description: `${t("widget.config.livePreview")}:\n  ${previewWidget(wc, costPreview)}\n\n${t("widget.config.modeDescription", { compact: modeLabel(MODE_COMPACT), full: modeLabel(MODE_FULL), custom: modeLabel(MODE_CUSTOM) })}`, currentValue: modeLabel(currentMode), values: MODE_KEYS.map(modeLabel) },
     { id: "placement", label: t("widget.config.placement"), description: t("widget.config.placementDescription"), currentValue: placementLabel(wc.placement ?? PLACEMENT_BELOW), values: [PLACEMENT_BELOW, PLACEMENT_ABOVE].map(placementLabel) },
-    { id: "showModel", label: t("widget.config.showModel"), description: t("widget.config.showModelDescription", { on: wc.showModel !== false ? `sonnet │ ${pricing.symbol}0.42/${pricing.symbol}1.00` : `${pricing.symbol}0.42/${pricing.symbol}1.00` }), currentValue: boolDisplay(wc.showModel !== false), values: [t("value.on"), t("value.off")] },
-    { id: "showProgressBar", label: t("widget.config.showProgress"), description: t("widget.config.showProgressDescription", { on: wc.showProgressBar !== false ? `${pricing.symbol}0.42/${pricing.symbol}1.00 ████░░░░░░` : `${pricing.symbol}0.42/${pricing.symbol}1.00` }), currentValue: boolDisplay(wc.showProgressBar !== false), values: [t("value.on"), t("value.off")] },
+    { id: "showModel", label: t("widget.config.showModel"), description: t("widget.config.showModelDescription", { on: wc.showModel !== false ? `sonnet │ ${costPreview}` : costPreview }), currentValue: boolDisplay(wc.showModel !== false), values: [t("value.on"), t("value.off")] },
+    { id: "showProgressBar", label: t("widget.config.showProgress"), description: t("widget.config.showProgressDescription", { on: wc.showProgressBar !== false ? `${costPreview} ████░░░░░░` : costPreview }), currentValue: boolDisplay(wc.showProgressBar !== false), values: [t("value.on"), t("value.off")] },
     { id: "showContextWindow", label: t("widget.config.showContext"), description: t("widget.config.showContextDescription"), currentValue: boolDisplay(wc.showContextWindow !== false), values: [t("value.on"), t("value.off")] },
     { id: "debug", label: t("config.debugLog"), description: t("config.debug.description"), currentValue: boolDisplay(!!current.debug), values: [t("value.on"), t("value.off")] },
   ];

@@ -15,6 +15,7 @@ const { createBudgetListForDashboard } = await import("../src/commands/config.js
 const { setLocale } = await import("../src/i18n/index.js");
 const { getPricingInfo, displayToUsd, usdToDisplay, formatUsdInCurrency } = await import("../src/core/pricing.js");
 const { askNewBudget } = await import("../src/ui/alert-card.js");
+const { BudgetDb } = await import("../src/db/client.js");
 const { renderReport, renderByDimension } = await import("../src/ui/report.js");
 const { evaluateLimit } = await import("../src/core/limits.js");
 const { visibleWidth } = await import("@earendil-works/pi-tui");
@@ -92,7 +93,7 @@ test("reports convert totals, averages and dimension rows in CNY", () => {
 });
 
 test("open dashboard updates overview, budget, widget and reports without reopening", async () => {
-  saveConfig({ ...DEFAULT_CONFIG, locale: "en", pricingAnchor: "usd", session: { usd: 1 } });
+  saveConfig({ ...DEFAULT_CONFIG, exchangeRate: { mode: "fixed", fixedRate: 7.2 }, locale: "en", pricingAnchor: "usd", session: { usd: 1 } });
   const handlers = new Map<string, Function>();
   let command: any;
   extension({ on: (name: string, handler: Function) => handlers.set(name, handler),
@@ -102,6 +103,7 @@ test("open dashboard updates overview, budget, widget and reports without reopen
   let widget = "";
   const notifications: string[] = [];
   let renders = 0;
+  const originalFetch = globalThis.fetch;
   const ctx = { hasUI: true, mode: "tui", cwd: scratch,
     model: { name: "deepseek-chat", id: "deepseek-chat" }, sessionManager: { getSessionFile: () => "test-session" },
     ui: {
@@ -152,7 +154,54 @@ test("open dashboard updates overview, budget, widget and reports without reopen
     dashboard.handleInput("down");
     assert.match(dashboard.render(120).join("\n"), /\$/);
     assert.equal(JSON.parse(readFileSync(CONFIG_PATH, "utf8")).pricingAnchor, "usd");
+    await command.handler("fx fixed 5", ctx);
+    await command.handler("", ctx);
+    dashboard.handleInput("right");
+    dashboard.handleInput("right");
+    dashboard.handleInput("\r"); // usd -> followModel (CNY)
+    dashboard.handleInput("left");
+    assert.match(dashboard.render(120).join("\n"), /¥10\.00/);
+    dashboard.handleInput("\r"); // ¥10 -> ¥20, stores $4 at rate 5
+    assert.equal(JSON.parse(readFileSync(CONFIG_PATH, "utf8")).session.usd, 4);
+    let requests = 0;
+    globalThis.fetch = async () => {
+      requests++;
+      return new Response(JSON.stringify({ base: "USD", quote: "CNY", rate: 6, date: new Date().toISOString().slice(0, 10) }));
+    };
+    await command.handler("fx refresh", ctx); // fixed: must not fetch
+    assert.equal(requests, 0);
+    await command.handler("fx auto", ctx);
+    assert.equal(requests, 1);
+    assert.equal(JSON.parse(readFileSync(CONFIG_PATH, "utf8")).session.usd, 4);
+    assert.match(dashboard.render(120).join("\n"), /¥24\.00/);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.match(widget, /¥24\.00/);
+    // A settings list created before refresh must not overwrite the new cache.
+    dashboard.handleInput("left");
+    dashboard.handleInput("left");
+    dashboard.handleInput("\r");
+    assert.equal(JSON.parse(readFileSync(CONFIG_PATH, "utf8")).exchangeRate.cachedRate, 6);
+    await command.handler("fx fixed 0", ctx);
+    assert.equal(JSON.parse(readFileSync(CONFIG_PATH, "utf8")).exchangeRate.mode, "auto");
+    // Delayed network results must not replace a newly selected fixed rate.
+    let resolveFetch!: (response: Response) => void;
+    globalThis.fetch = async () => new Promise<Response>((resolve) => { resolveFetch = resolve; });
+    const pendingRefresh = command.handler("fx refresh", ctx);
+    await command.handler("fx fixed 8", ctx);
+    resolveFetch(new Response(JSON.stringify({ base: "USD", quote: "CNY", rate: 99, date: new Date().toISOString().slice(0, 10) })));
+    await pendingRefresh;
+    const finalConfig = JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
+    assert.equal(finalConfig.exchangeRate.mode, "fixed");
+    assert.equal(finalConfig.exchangeRate.fixedRate, 8);
+    assert.equal(finalConfig.exchangeRate.cachedRate, 6);
+    // Verify newly estimated CNY costs persist as USD at that same fixed rate.
+    await handlers.get("message_end")!({ message: { role: "assistant", model: "deepseek-chat", usage: { input: 1000000, output: 0 } } }, ctx);
+    const recorded = await BudgetDb.open(join(scratch, ".pi/budget.db"));
+    try { assert.equal(recorded.getTotals(0).usd, 1 / 8); } finally { recorded.close(); }
+    await command.handler("report", ctx);
+    assert.match(notifications.at(-1)!, /¥1\.00/);
   } finally {
+    globalThis.fetch = originalFetch;
     await handlers.get("session_shutdown")!({}, ctx);
   }
 });

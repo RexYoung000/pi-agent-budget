@@ -20,6 +20,25 @@ export const LOCALE_LABELS: Record<Locale, string> = {
 
 /** 翻译键定义 */
 export interface Translations {
+  "fx.mode": string;
+  "fx.mode.description": string;
+  "fx.fixed": string;
+  "fx.auto": string;
+  "fx.rate": string;
+  "fx.rate.description": string;
+  "fx.status": string;
+  "fx.failure": string;
+  "fx.source.description": string;
+  "fx.failed": string;
+  "fx.cached": string;
+  "fx.builtin": string;
+  "fx.ready": string;
+  "fx.updated": string;
+  "fx.usage": string;
+  "fx.offline": string;
+  "fx.refreshing": string;
+  "fx.fixedRefresh": string;
+
   // ── widget ──
   "widget.prefix": string;
 
@@ -298,10 +317,10 @@ const en: Translations = {
   "pricing.priceDate": "Price date",
   "pricing.priceDate.description": "Date of the built-in price table used by this extension.",
   "pricing.fxDate": "FX date",
-  "pricing.fxDate.description": "Exchange-rate date used only when display currency differs from native currency.",
-  "pricing.fxDate.notNeeded": "Not needed",
-  "pricing.updateToday": "Update to today",
-  "pricing.updateToday.description": "Mark the built-in price table and FX date as updated to today. Remote fetching can be added later.",
+  "pricing.fxDate.description": "Date of the actual reference-rate data; fixed rates have no market date.",
+  "pricing.fxDate.notNeeded": "Fixed rate",
+  "pricing.updateToday": "Refresh exchange rate",
+  "pricing.updateToday.description": "Fetch the latest USD/CNY reference rate. Model prices are not changed.",
   "pricing.status.latest": "Latest",
   "pricing.action.update": "Update",
 
@@ -428,6 +447,24 @@ const en: Translations = {
   "log.hardLimitError": "Hard limit popup failed",
   "log.softLimitError": "Soft limit popup failed",
   "log.configLoadError": "loadConfig failed, using defaults",
+  "fx.mode": "Exchange-rate mode",
+  "fx.mode.description": "Automatic daily refresh or fixed rate. Set a value with /budget fx fixed <rate>.",
+  "fx.fixed": "Fixed",
+  "fx.auto": "Automatic",
+  "fx.rate": "USD/CNY rate",
+  "fx.rate.description": "Set any positive rate: /budget fx fixed 7.1. Return to automatic: /budget fx auto.",
+  "fx.status": "Rate status",
+  "fx.failure": "Refresh failed; retaining the last valid rate or built-in reference. Use /budget fx refresh to retry.",
+  "fx.source.description": "Frankfurter daily reference, not your payment settlement rate. Built-in is used only without a saved rate.",
+  "fx.failed": "Refresh failed",
+  "fx.cached": "Frankfurter (cached)",
+  "fx.builtin": "Built-in reference",
+  "fx.ready": "Ready",
+  "fx.updated": "Exchange rate updated.",
+  "fx.usage": "Usage: /budget fx [auto | fixed <CNY per USD> | refresh]. Rate must be finite and greater than zero.",
+  "fx.offline": "Offline: using the saved rate or built-in reference.",
+  "fx.refreshing": "Refreshing exchange rate…",
+  "fx.fixedRefresh": "Fixed mode: use /budget fx auto to enable online updates.",
 };
 
 const zhCN: Translations = {
@@ -489,10 +526,10 @@ const zhCN: Translations = {
   "pricing.priceDate": "价格表日期",
   "pricing.priceDate.description": "当前扩展内置价格表对应的日期。",
   "pricing.fxDate": "汇率日期",
-  "pricing.fxDate.description": "仅当展示币种不同于模型原生币种时使用。",
-  "pricing.fxDate.notNeeded": "不需要",
-  "pricing.updateToday": "更新到今日价格表",
-  "pricing.updateToday.description": "把内置价格表和汇率状态标记为今天。后续可扩展远程拉取。",
+  "pricing.fxDate.description": "实际参考汇率数据的日期；固定汇率没有市场数据日期。",
+  "pricing.fxDate.notNeeded": "固定汇率",
+  "pricing.updateToday": "立即更新汇率",
+  "pricing.updateToday.description": "获取最新 USD/CNY 参考汇率，不更改模型价格表。",
   "pricing.status.latest": "最新",
   "pricing.action.update": "更新",
 
@@ -619,6 +656,24 @@ const zhCN: Translations = {
   "log.hardLimitError": "硬限弹窗失败",
   "log.softLimitError": "软限弹窗失败",
   "log.configLoadError": "loadConfig 失败，使用默认值",
+  "fx.mode": "汇率模式",
+  "fx.mode.description": "自动每日更新或固定汇率。用 /budget fx fixed <汇率> 设置固定值。",
+  "fx.fixed": "固定",
+  "fx.auto": "自动",
+  "fx.rate": "美元兑人民币",
+  "fx.rate.description": "自定义汇率：/budget fx fixed 7.1；恢复自动：/budget fx auto。",
+  "fx.status": "汇率状态",
+  "fx.failure": "更新失败，保留上次有效汇率或内置参考值。可用 /budget fx refresh 重试。",
+  "fx.source.description": "Frankfurter 每日参考汇率，不是支付结算汇率；没有缓存时才用内置参考值。",
+  "fx.failed": "更新失败",
+  "fx.cached": "Frankfurter（已缓存）",
+  "fx.builtin": "内置参考值",
+  "fx.ready": "可刷新",
+  "fx.updated": "汇率已更新。",
+  "fx.usage": "用法：/budget fx [auto | fixed <1 美元对应人民币数> | refresh]；汇率须为有限正数。",
+  "fx.offline": "离线模式：使用已保存汇率或内置参考值。",
+  "fx.refreshing": "正在更新汇率…",
+  "fx.fixedRefresh": "当前为固定汇率；用 /budget fx auto 开启联网更新。",
 };
 
 const ja: Translations = {
@@ -680,10 +735,10 @@ const ja: Translations = {
   "pricing.priceDate": "価格表日付",
   "pricing.priceDate.description": "この拡張の内蔵価格表の日付。",
   "pricing.fxDate": "汇率日期",
-  "pricing.fxDate.description": "表示通貨が元の通貨と異なる場合のみ使用。",
-  "pricing.fxDate.notNeeded": "不需要",
-  "pricing.updateToday": "今日に更新",
-  "pricing.updateToday.description": "内蔵価格表と為替日付を今日としてマークします。将来リモート取得を追加できます。",
+  "pricing.fxDate.description": "参考レートの実際のデータ日付。固定レートにはありません。",
+  "pricing.fxDate.notNeeded": "固定レート",
+  "pricing.updateToday": "為替を更新",
+  "pricing.updateToday.description": "最新の USD/CNY 参考レートを取得。モデル価格は変更しません。",
   "pricing.status.latest": "最新",
   "pricing.action.update": "更新",
 
@@ -810,6 +865,24 @@ const ja: Translations = {
   "log.hardLimitError": "ハードリミットポップアップエラー",
   "log.softLimitError": "ソフトリミットポップアップエラー",
   "log.configLoadError": "loadConfig 失敗、デフォルト値を使用",
+  "fx.mode": "為替モード",
+  "fx.mode.description": "毎日自動更新または固定。/budget fx fixed <レート> で設定。",
+  "fx.fixed": "固定",
+  "fx.auto": "自動",
+  "fx.rate": "USD/CNY レート",
+  "fx.rate.description": "設定: /budget fx fixed 7.1。自動に戻す: /budget fx auto。",
+  "fx.status": "為替状態",
+  "fx.failure": "更新失敗。前回のレートまたは内蔵値を使用。/budget fx refresh で再試行。",
+  "fx.source.description": "Frankfurter の日次参考レート。決済レートではありません。未取得時は内蔵値。",
+  "fx.failed": "更新失敗",
+  "fx.cached": "Frankfurter（保存済み）",
+  "fx.builtin": "内蔵参考値",
+  "fx.ready": "更新可能",
+  "fx.updated": "為替を更新しました。",
+  "fx.usage": "使い方: /budget fx [auto | fixed <CNY/USD> | refresh]。有限の正数を入力。",
+  "fx.offline": "オフライン: 保存済みレートまたは内蔵値を使用。",
+  "fx.refreshing": "為替を更新中…",
+  "fx.fixedRefresh": "固定モードです。/budget fx auto で自動更新を有効に。",
 };
 
 const ko: Translations = {
@@ -871,10 +944,10 @@ const ko: Translations = {
   "pricing.priceDate": "가격표 날짜",
   "pricing.priceDate.description": "이 확장에 내장된 가격표 날짜입니다.",
   "pricing.fxDate": "환율 날짜",
-  "pricing.fxDate.description": "표시 통화가 원래 통화와 다를 때만 사용됩니다.",
-  "pricing.fxDate.notNeeded": "필요 없음",
-  "pricing.updateToday": "오늘로 업데이트",
-  "pricing.updateToday.description": "내장 가격표와 환율 날짜를 오늘로 표시합니다. 추후 원격 가져오기를 추가할 수 있습니다.",
+  "pricing.fxDate.description": "참고 환율 데이터의 실제 날짜. 고정 환율에는 없습니다.",
+  "pricing.fxDate.notNeeded": "고정 환율",
+  "pricing.updateToday": "환율 업데이트",
+  "pricing.updateToday.description": "최신 USD/CNY 참고 환율을 가져옵니다. 모델 가격은 변경하지 않습니다.",
   "pricing.status.latest": "최신",
   "pricing.action.update": "업데이트",
 
@@ -1001,6 +1074,24 @@ const ko: Translations = {
   "log.hardLimitError": "하드 리밋 팝업 오류",
   "log.softLimitError": "소프트 리밋 팝업 오류",
   "log.configLoadError": "loadConfig 실패, 기본값 사용",
+  "fx.mode": "환율 모드",
+  "fx.mode.description": "매일 자동 업데이트 또는 고정. /budget fx fixed <환율>로 설정.",
+  "fx.fixed": "고정",
+  "fx.auto": "자동",
+  "fx.rate": "USD/CNY 환율",
+  "fx.rate.description": "설정: /budget fx fixed 7.1. 자동 복귀: /budget fx auto.",
+  "fx.status": "환율 상태",
+  "fx.failure": "업데이트 실패. 이전 환율 또는 내장 값을 유지합니다. /budget fx refresh로 재시도.",
+  "fx.source.description": "Frankfurter 일별 참고 환율이며 결제 환율이 아닙니다. 캐시가 없으면 내장 값을 사용합니다.",
+  "fx.failed": "업데이트 실패",
+  "fx.cached": "Frankfurter (캐시)",
+  "fx.builtin": "내장 참고값",
+  "fx.ready": "업데이트 가능",
+  "fx.updated": "환율이 업데이트되었습니다.",
+  "fx.usage": "사용법: /budget fx [auto | fixed <CNY/USD> | refresh]. 유한한 양수를 입력하세요.",
+  "fx.offline": "오프라인: 저장된 환율 또는 내장 값을 사용합니다.",
+  "fx.refreshing": "환율 업데이트 중…",
+  "fx.fixedRefresh": "고정 모드입니다. /budget fx auto로 온라인 업데이트를 켜세요.",
 };
 
 /** 所有翻译数据 */

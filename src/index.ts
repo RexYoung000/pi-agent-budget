@@ -12,7 +12,7 @@
  *   pi -e ./src/index.ts
  */
 
-import type { ExtensionAPI, ExtensionUIContext, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionUIContext, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import { BudgetDb } from "./db/client.js";
 import { createTracker, lastToolName } from "./core/tracker.js";
@@ -34,6 +34,7 @@ import { renderOverview, type OverviewInput } from "./commands/overview.js";
 import { parseRange, parseByDim, runReport, runBy, rangeToSince, type ReportRange } from "./commands/report.js";
 import { openWidgetSettings, openFullSettings, createSettingsListForDashboard, createBudgetListForDashboard, createPricingListForDashboard } from "./commands/config.js";
 import { getPricingInfo, formatMoney, usdToDisplay, formatUsdInCurrency, currencyLabel, calculateCostFromTokens, lookupModelPrice, displayToUsd } from "./core/pricing.js";
+import { effectiveExchangeRate, fetchExchangeRate, shouldRefreshExchangeRate, validExchangeRate } from "./core/exchange-rate.js";
 import { parseExportFormat, runExport as runExportCommand } from "./commands/export.js";
 
 export default function (pi: ExtensionAPI) {
@@ -49,6 +50,60 @@ export default function (pi: ExtensionAPI) {
   initLocale(config.locale);
 
   let currentModelDisplay = "";
+  let fxController = new AbortController();
+  let fxTimer: ReturnType<typeof setInterval> | undefined;
+  let fxPending: Promise<void> | undefined;
+  let fxRevision = 0;
+  let refreshDashboard: (() => void) | undefined;
+
+  async function updateExchangeRate(ctx: ExtensionContext, force = false): Promise<void> {
+    if (config.exchangeRate?.mode === "fixed") {
+      if (force) ctx.ui.notify(t("fx.fixedRefresh"), "info");
+      return;
+    }
+    if (!force && !shouldRefreshExchangeRate(config)) return;
+    if (process.env.PI_OFFLINE === "1") {
+      if (force) ctx.ui.notify(t("fx.offline"), "warning");
+      return;
+    }
+    if (fxPending) return fxPending;
+    const revision = fxRevision;
+    const controller = fxController;
+    if (force) ctx.ui.notify(t("fx.refreshing"), "info");
+    const operation = (async () => {
+      const result = await fetchExchangeRate(config.exchangeRate, { signal: controller.signal });
+      if (controller.signal.aborted || revision !== fxRevision || config.exchangeRate?.mode === "fixed") return;
+      config = { ...config, exchangeRate: result };
+      saveConfig(config);
+      refreshWidgetAfterConfig(ctx);
+      refreshDashboard?.();
+      if (result.lastError) ctx.ui.notify(t("fx.failure"), "warning");
+      else if (force) ctx.ui.notify(t("fx.updated"), "info");
+    })().catch((error) => {
+      if (!controller.signal.aborted) ctx.ui.notify(`${t("fx.failure")} (${String(error)})`, "warning");
+    });
+    fxPending = operation;
+    try { await operation; }
+    finally { if (fxPending === operation) fxPending = undefined; }
+  }
+
+  function replaceConfig(next: BudgetConfig, ctx: ExtensionContext): void {
+    next = { ...next, exchangeRate: {
+      ...config.exchangeRate,
+      mode: next.exchangeRate?.mode ?? "auto",
+      fixedRate: next.exchangeRate?.fixedRate ?? config.exchangeRate?.fixedRate,
+    } };
+    if (next.exchangeRate?.mode !== config.exchangeRate?.mode || next.exchangeRate?.fixedRate !== config.exchangeRate?.fixedRate) {
+      fxRevision++;
+      fxController.abort();
+      fxController = new AbortController();
+      fxPending = undefined;
+    }
+    config = next;
+    saveConfig(config);
+    refreshWidgetAfterConfig(ctx);
+    void updateExchangeRate(ctx);
+  }
 
   // 软限去重：每个 session 在同一阈值下只弹一次；直到用户调高预算或跨过硬限
   const softLimitAlreadyShown = new Set<string>();
@@ -113,8 +168,8 @@ export default function (pi: ExtensionAPI) {
     const pricing = getPricingInfo(config, modelDisplay);
     const state: WidgetState = {
       model: modelDisplay,
-      usedUsd: usdToDisplay(usedUsd, pricing.displayCurrency),
-      budgetUsd: usdToDisplay(config.session?.usd ?? 0, pricing.displayCurrency),
+      usedUsd: usdToDisplay(usedUsd, pricing.displayCurrency, pricing.exchangeRate),
+      budgetUsd: usdToDisplay(config.session?.usd ?? 0, pricing.displayCurrency, pricing.exchangeRate),
       currencySymbol: pricing.symbol,
       context: context ? { tokens: context.tokens, contextWindow: context.contextWindow, percent: context.percent } : undefined,
     };
@@ -146,19 +201,19 @@ export default function (pi: ExtensionAPI) {
     const pricing = getPricingInfo(config, modelName);
     const displayStatus: LimitStatus = {
       ...status,
-      current: usdToDisplay(status.current, pricing.displayCurrency),
-      budget: usdToDisplay(status.budget, pricing.displayCurrency),
-      threshold: usdToDisplay(status.threshold, pricing.displayCurrency),
+      current: usdToDisplay(status.current, pricing.displayCurrency, pricing.exchangeRate),
+      budget: usdToDisplay(status.budget, pricing.displayCurrency, pricing.exchangeRate),
+      threshold: usdToDisplay(status.threshold, pricing.displayCurrency, pricing.exchangeRate),
     };
 
     try {
       const action = await showSoftLimitCard(ui, displayStatus, pricing.symbol);
       if (action === "raise") {
-        const displayBudget = usdToDisplay(budget, pricing.displayCurrency);
+        const displayBudget = usdToDisplay(budget, pricing.displayCurrency, pricing.exchangeRate);
         const newAmount = await askNewBudget(ui, displayBudget, pricing.symbol);
         if (newAmount && newAmount > 0) {
           // 用户在弹窗输入的是显示币种金额，转回 USD 存储
-          const usdAmount = displayToUsd(newAmount, pricing.displayCurrency);
+          const usdAmount = displayToUsd(newAmount, pricing.displayCurrency, pricing.exchangeRate);
           config = applySet({ scope: "session", amount: usdAmount }, config);
           softLimitAlreadyShown.delete(key);
           ui.notify(t("set.raisedTo", { amount: formatMoney(newAmount, pricing.displayCurrency) }), "info");
@@ -209,6 +264,7 @@ export default function (pi: ExtensionAPI) {
           usage?.cacheRead ?? 0,
           usage?.cacheWrite ?? 0,
           message.model,
+          effectiveExchangeRate(config),
         )
       : null;
     const actualTotal = providerHasCost ? costTotal! : (fallback?.total ?? 0);
@@ -272,7 +328,15 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     try {
       uiRef = ctx.ui;
+      fxController.abort();
+      fxController = new AbortController();
+      fxRevision++;
+      fxPending = undefined;
+      if (fxTimer) clearInterval(fxTimer);
       reloadConfig(); // 用户可能在 session 间手编辑了配置
+      void updateExchangeRate(ctx);
+      fxTimer = setInterval(() => { void updateExchangeRate(ctx); }, 60 * 60 * 1000);
+      fxTimer.unref();
       const sessionId = getSessionId(ctx);
 
       let usedUsd = 0;
@@ -315,6 +379,12 @@ export default function (pi: ExtensionAPI) {
   // session_shutdown：清理 widget + db
   // ────────────────────────────────────────────────────────────────────────
   pi.on("session_shutdown", async (_event, ctx) => {
+    fxController.abort();
+    fxRevision++;
+    fxPending = undefined;
+    if (fxTimer) clearInterval(fxTimer);
+    fxTimer = undefined;
+    refreshDashboard = undefined;
     if (uiRef ?? ctx.ui) {
       createWidgetRenderer({ ui: (uiRef ?? ctx.ui) as UiLike }).clear();
     }
@@ -360,17 +430,17 @@ export default function (pi: ExtensionAPI) {
       const pricing = getPricingInfo(config, modelName);
       const displayStatus: LimitStatus = {
         ...status,
-        current: usdToDisplay(status.current, pricing.displayCurrency),
-        budget: usdToDisplay(status.budget, pricing.displayCurrency),
-        threshold: usdToDisplay(status.threshold, pricing.displayCurrency),
+        current: usdToDisplay(status.current, pricing.displayCurrency, pricing.exchangeRate),
+        budget: usdToDisplay(status.budget, pricing.displayCurrency, pricing.exchangeRate),
+        threshold: usdToDisplay(status.threshold, pricing.displayCurrency, pricing.exchangeRate),
       };
       const action = await showHardLimitCard(ctx.ui, displayStatus, pricing.symbol);
       if (action === "raise_and_continue") {
-        const displayBudget = usdToDisplay(budget, pricing.displayCurrency);
+        const displayBudget = usdToDisplay(budget, pricing.displayCurrency, pricing.exchangeRate);
         const newAmount = await askNewBudget(ctx.ui, displayBudget, pricing.symbol);
         if (newAmount && newAmount > 0) {
           // 用户在弹窗输入的是显示币种金额，转回 USD 存储
-          const usdAmount = displayToUsd(newAmount, pricing.displayCurrency);
+          const usdAmount = displayToUsd(newAmount, pricing.displayCurrency, pricing.exchangeRate);
           config = applySet({ scope: "session", amount: usdAmount }, config);
           ctx.ui.notify(t("set.raisedTo", { amount: formatMoney(newAmount, pricing.displayCurrency) }) + ", " + t("set.continued"), "info");
           return { action: "continue" as const };
@@ -403,6 +473,24 @@ export default function (pi: ExtensionAPI) {
       const [sub, ...rest] = trimmed.split(/\s+/);
       const restStr = rest.join(" ");
 
+      if (sub === "fx") {
+        const [action, raw, ...extra] = rest;
+        if (!action) {
+          const info = getPricingInfo(config, ctx.model?.name ?? ctx.model?.id);
+          ctx.ui.notify(`1 USD = ${info.exchangeRate} CNY · ${t(config.exchangeRate?.mode === "fixed" ? "fx.fixed" : "fx.auto")} · ${info.fxDate ?? t("pricing.fxDate.notNeeded")}`, "info");
+        } else if (action === "fixed" && raw && !extra.length && validExchangeRate(Number(raw))) {
+          const next = { ...config, exchangeRate: { ...config.exchangeRate, mode: "fixed" as const, fixedRate: Number(raw) } };
+          replaceConfig(next, ctx);
+          ctx.ui.notify(`1 USD = ${Number(raw)} CNY · ${t("fx.fixed")}`, "info");
+        } else if (action === "auto" && !raw) {
+          const next = { ...config, exchangeRate: { ...config.exchangeRate, mode: "auto" as const } };
+          replaceConfig(next, ctx);
+          await updateExchangeRate(ctx, true);
+        } else if (action === "refresh" && !raw) {
+          await updateExchangeRate(ctx, true);
+        } else ctx.ui.notify(t("fx.usage"), "warning");
+        return;
+      }
       if (sub === "set") {
         await runSetCommand(restStr, ctx);
         return;
@@ -454,12 +542,12 @@ export default function (pi: ExtensionAPI) {
       const budgetUsd = config.session?.usd;
       const status = checkSessionLimit(usedUsd, budgetUsd ?? 0, config);
       const lines: string[] = [];
-      lines.push(`${t("overview.sessionCost")}: ${formatUsdInCurrency(usedUsd, pricing.displayCurrency)}${budgetUsd && budgetUsd > 0 ? ` / ${formatUsdInCurrency(budgetUsd, pricing.displayCurrency)}` : ` (${t("overview.noBudget")})`}`);
+      lines.push(`${t("overview.sessionCost")}: ${formatUsdInCurrency(usedUsd, pricing.displayCurrency, pricing.exchangeRate)}${budgetUsd && budgetUsd > 0 ? ` / ${formatUsdInCurrency(budgetUsd, pricing.displayCurrency, pricing.exchangeRate)}` : ` (${t("overview.noBudget")})`}`);
       lines.push(`${t("overview.model")}: ${modelName || t("report.unknown")}`);
       lines.push(`${t("pricing.nativeCurrency")}: ${currencyLabel(pricing.nativeCurrency)}`);
       lines.push(`${t("overview.sessionContext")}: ${sessionId}`);
       if (lastRequestSnap) {
-        lines.push(`${t("overview.last")}: ${formatUsdInCurrency(lastRequestSnap.costUsd, pricing.displayCurrency)} (${t("overview.inputTokens", { count: lastRequestSnap.inputTokens })} / ${t("overview.outputTokens", { count: lastRequestSnap.outputTokens })})`);
+        lines.push(`${t("overview.last")}: ${formatUsdInCurrency(lastRequestSnap.costUsd, pricing.displayCurrency, pricing.exchangeRate)} (${t("overview.inputTokens", { count: lastRequestSnap.inputTokens })} / ${t("overview.outputTokens", { count: lastRequestSnap.outputTokens })})`);
       }
       if (context) {
         const tokens = context.tokens ?? 0;
@@ -486,20 +574,18 @@ export default function (pi: ExtensionAPI) {
         theme,
         {
           budgetFactory: () => createBudgetListForDashboard(config, modelName, (c) => {
-            config = c;
-            refreshWidgetAfterConfig(ctx);
+            replaceConfig(c, ctx);
           }),
           pricingFactory: () => createPricingListForDashboard(config, modelName, (c) => {
-            config = c;
-            refreshWidgetAfterConfig(ctx);
-          }),
+            replaceConfig(c, ctx);
+          }, () => { void updateExchangeRate(ctx, true); }),
           settingsFactory: () => createSettingsListForDashboard(config, modelName, (c) => {
-            config = c;
-            refreshWidgetAfterConfig(ctx);
+            replaceConfig(c, ctx);
           }),
         },
-        () => done(),
+        () => { refreshDashboard = undefined; done(); },
       );
+      refreshDashboard = () => { dashboard.invalidate(); tui.requestRender(); };
       return {
         ...dashboard,
         handleInput(data: string) {
@@ -566,7 +652,7 @@ export default function (pi: ExtensionAPI) {
     }
     try {
       const db = await getDb();
-      await runReport(db, range, ctx, getPricingInfo(config, ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay).displayCurrency);
+      await runReport(db, range, ctx, getPricingInfo(config, ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay).displayCurrency, effectiveExchangeRate(config));
     } catch (err) {
       ctx.ui.notify(t("report.generationFailed") + `: ${(err as Error).message}`, "error");
     }
@@ -587,7 +673,7 @@ export default function (pi: ExtensionAPI) {
     }
     try {
       const db = await getDb();
-      await runBy(db, dim, range, ctx, getPricingInfo(config, ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay).displayCurrency);
+      await runBy(db, dim, range, ctx, getPricingInfo(config, ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay).displayCurrency, effectiveExchangeRate(config));
     } catch (err) {
       ctx.ui.notify(t("error.sliceFailed") + `: ${(err as Error).message}`, "error");
     }
@@ -596,7 +682,7 @@ export default function (pi: ExtensionAPI) {
   async function runConfigCommand(ctx: ExtensionCommandContext): Promise<void> {
     if (!ctx.hasUI || ("mode" in ctx && ctx.mode !== "tui")) return;
     try {
-      config = await openFullSettings(config, ctx.ui, (c) => { config = c; refreshWidgetAfterConfig(ctx); }, ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay);
+      await openFullSettings(config, ctx.ui, (c) => { replaceConfig(c, ctx); }, ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay);
       refreshWidgetAfterConfig(ctx);
     } catch (err) {
       ctx.ui.notify(t("error.settingsFailed") + `: ${(err as Error).message}`, "error");
@@ -606,14 +692,14 @@ export default function (pi: ExtensionAPI) {
   async function runWidgetCommand(ctx: ExtensionCommandContext): Promise<void> {
     if (!ctx.hasUI || ("mode" in ctx && ctx.mode !== "tui")) return;
     try {
-      config = await openWidgetSettings(config, ctx.ui, (c) => { config = c; refreshWidgetAfterConfig(ctx); }, ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay);
+      await openWidgetSettings(config, ctx.ui, (c) => { replaceConfig(c, ctx); }, ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay);
       refreshWidgetAfterConfig(ctx);
     } catch (err) {
       ctx.ui.notify(t("error.settingsFailed") + `: ${(err as Error).message}`, "error");
     }
   }
 
-  function refreshWidgetAfterConfig(ctx: ExtensionCommandContext): void {
+  function refreshWidgetAfterConfig(ctx: ExtensionContext): void {
     // 配置可能改变了 locale，同步更新
     if (config.locale) setLocale(config.locale);
     if (!uiRef) return;

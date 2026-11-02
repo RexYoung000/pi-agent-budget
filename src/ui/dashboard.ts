@@ -142,7 +142,7 @@ export function createDashboard(
     },
 
     invalidate() {
-      for (const list of lists) list?.invalidate?.();
+      resetAllLists();
     },
   };
 }
