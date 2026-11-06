@@ -148,6 +148,8 @@ export interface WidgetRefresher {
 export function createWidgetRenderer(opts: {
   ui: Pick<ExtensionUIContext, "setWidget">;
   config?: WidgetConfig;
+  /** 每次绘制时读取实时上下文：压缩刚结束时快照会过期，与 Pi 自带底栏一致。 */
+  readContext?: () => WidgetState["context"];
 }): WidgetRefresher {
   const wc = opts.config ?? {};
   const placement = wc.placement === "aboveEditor" ? "aboveEditor" : "belowEditor";
@@ -161,10 +163,10 @@ export function createWidgetRenderer(opts: {
       opts.ui.setWidget(
         "pi-budget",
         (_tui, theme) => {
-          const lines = renderWidgetLines(state, wc, theme);
           return {
             render(_width: number) {
-              return lines;
+              const live = opts.readContext?.();
+              return renderWidgetLines(live === undefined ? state : { ...state, context: live }, wc, theme);
             },
             invalidate() {},
           };

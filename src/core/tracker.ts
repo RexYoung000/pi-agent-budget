@@ -72,17 +72,18 @@ export function createTracker(db: BudgetDb): Tracker {
         taskId: rec.taskId,
       };
       db.insertCost(full);
-      // 更新 session 级缓存
-      sessionCache.set(
-        full.sessionId,
-        (sessionCache.get(full.sessionId) ?? 0) + full.cost.total,
-      );
+      // 缓存必须从数据库中的历史金额起算：恢复会话后首条记录只累加新一笔，
+      // 会把之前同一会话（或同一模型）的消费从底栏和限额判断中抹掉。
+      const previousSession = sessionCache.has(full.sessionId)
+        ? sessionCache.get(full.sessionId)!
+        : db.sumSessionUsd(full.sessionId) - full.cost.total;
+      sessionCache.set(full.sessionId, previousSession + full.cost.total);
       // 更新 session+model 级缓存
       const key = modelCacheKey(full.sessionId, full.model);
-      sessionModelCache.set(
-        key,
-        (sessionModelCache.get(key) ?? 0) + full.cost.total,
-      );
+      const previousModel = sessionModelCache.has(key)
+        ? sessionModelCache.get(key)!
+        : db.sumSessionModelUsd(full.sessionId, full.model) - full.cost.total;
+      sessionModelCache.set(key, previousModel + full.cost.total);
     },
 
     sessionUsd(sessionId) {

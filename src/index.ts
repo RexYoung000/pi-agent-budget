@@ -50,6 +50,8 @@ export default function (pi: ExtensionAPI) {
   initLocale(config.locale);
 
   let currentModelDisplay = "";
+  // 上下文变化不代表产生了新消费；重绘时沿用上次金额，避免按模型显示名重新查询导致清零。
+  let lastUsedUsd = 0;
   let fxController = new AbortController();
   let fxTimer: ReturnType<typeof setInterval> | undefined;
   let fxPending: Promise<void> | undefined;
@@ -158,11 +160,13 @@ export default function (pi: ExtensionAPI) {
 
   function refreshWidget(
     ui: UiLike,
-    ctx: { model?: { name?: string; id?: string } | null; getContextUsage?: () => { tokens: number | null; contextWindow: number; percent: number | null } | undefined },
+    ctx: Pick<ExtensionContext, "hasUI" | "mode" | "model" | "getContextUsage">,
     usedUsd: number,
   ): void {
+    if (!ctx.hasUI || ctx.mode !== "tui") return;
     const modelDisplay = ctx.model?.name ?? ctx.model?.id ?? currentModelDisplay ?? "?";
     currentModelDisplay = modelDisplay;
+    lastUsedUsd = usedUsd;
     const wc = widgetConfig();
     const context = ctx.getContextUsage?.();
     const pricing = getPricingInfo(config, modelDisplay);
@@ -173,7 +177,17 @@ export default function (pi: ExtensionAPI) {
       currencySymbol: pricing.symbol,
       context: context ? { tokens: context.tokens, contextWindow: context.contextWindow, percent: context.percent } : undefined,
     };
-    createWidgetRenderer({ ui, config: wc }).refresh(state);
+    // 消息发起时 Pi 可能还未把最新消息计入上下文，消息结束后也不会再触发刷新；
+    // 因此绘制时重新读取，避免底栏落后一条消息或停在压缩前的快照。
+    const readContext = (): WidgetState["context"] => {
+      try {
+        const live = ctx.getContextUsage?.();
+        return live ? { tokens: live.tokens, contextWindow: live.contextWindow, percent: live.percent } : undefined;
+      } catch {
+        return undefined;
+      }
+    };
+    createWidgetRenderer({ ui, config: wc, readContext }).refresh(state);
   }
 
   // ────────────────────────────────────────────────────────────────────────
@@ -374,6 +388,19 @@ export default function (pi: ExtensionAPI) {
       console.warn(`[pi-budget] ${t("log.modelSelectError")}: ${(err as Error).message}`);
     }
   });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // session_compact / session_tree：上下文规模变化但不会有 assistant 消息
+  // ────────────────────────────────────────────────────────────────────────
+  // 压缩后 Pi 先返回 tokens: null（下次响应才重新计数），切分支则换成另一条分支的长度。
+  // 这两件事都不触发 message_end，不主动重绘就会一直显示压缩前的旧长度。
+  function refreshContextWidget(ctx: ExtensionContext): void {
+    if (!uiRef) return;
+    refreshWidget(uiRef, ctx, lastUsedUsd);
+  }
+
+  pi.on("session_compact", (_event, ctx) => { refreshContextWidget(ctx); });
+  pi.on("session_tree", (_event, ctx) => { refreshContextWidget(ctx); });
 
   // ────────────────────────────────────────────────────────────────────────
   // session_shutdown：清理 widget + db
